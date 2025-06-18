@@ -2,23 +2,39 @@
 
 import type React from "react"
 import { useState, useEffect, useMemo } from "react"
-import { Globe, BarChart3, Tv, Radio, Smartphone, Monitor, Volume2, Eye, Play, MousePointer, Users } from "lucide-react"
-import { useResumoData, useGA4ResumoData, useConsolidadoData } from "../../services/api"
+import {
+  Globe,
+  BarChart3,
+  Tv,
+  Radio,
+  Smartphone,
+  Monitor,
+  Volume2,
+  Eye,
+  Play,
+  MousePointer,
+  Users,
+  MapPin,
+} from "lucide-react"
+import { useShareCCBBData } from "../../services/api"
 import Loading from "../../components/Loading/Loading"
 
 interface VehicleData {
-  veiculo: string
-  dsp: string
-  custoInvestido: number
-  custoPrevisto: number
-  mes: string
-  pacing: number
-  shareInvestido: number
-  sharePrevisto: number
+  plataforma: string
+  investimentoPrevisto: number
+  custoTotal: number
+  shareInternet: number
+  shareInvestimentoTotal: number
+  praca: string
+  usoEstrategico: string
+  shareInvestimentoUtilizado: number
+  totalPrevisto: number
+  custoUtilizado: number
+  shareTotal: number
 }
 
-interface MonthlyTotals {
-  mes: string
+interface PracaTotals {
+  praca: string
   totalInvestido: number
   totalPrevisto: number
   pacing: number
@@ -34,22 +50,21 @@ interface CampaignSummary {
 }
 
 interface AggregatedVehicleData {
-  veiculo: string
-  custoInvestido: number
-  custoPrevisto: number
+  plataforma: string
+  investimentoPrevisto: number
+  custoTotal: number
   pacing: number
-  shareInvestido: number
-  sharePrevisto: number
+  shareInvestimentoTotal: number
+  shareInternet: number
+  usoEstrategico: string
 }
 
 const EstrategiaOnline: React.FC = () => {
-  const { data: resumoData, loading: resumoLoading, error: resumoError } = useResumoData()
-  const { data: ga4Data, loading: ga4Loading, error: ga4Error } = useGA4ResumoData()
-  const { data: consolidadoData, loading: consolidadoLoading, error: consolidadoError } = useConsolidadoData()
+  const { data: shareData, loading: shareLoading, error: shareError } = useShareCCBBData()
   const [vehicleData, setVehicleData] = useState<VehicleData[]>([])
-  const [monthlyTotals, setMonthlyTotals] = useState<MonthlyTotals[]>([])
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
-  const [availableMonths, setAvailableMonths] = useState<string[]>([])
+  const [pracaTotals, setPracaTotals] = useState<PracaTotals[]>([])
+  const [selectedPraca, setSelectedPraca] = useState<string | null>(null)
+  const [availablePracas, setAvailablePracas] = useState<string[]>([])
   const [campaignSummary, setCampaignSummary] = useState<CampaignSummary>({
     totalInvestimentoPrevisto: 0,
     totalCustoInvestido: 0,
@@ -59,8 +74,8 @@ const EstrategiaOnline: React.FC = () => {
     vtr: 85,
   })
 
-  const loading = resumoLoading || ga4Loading || consolidadoLoading
-  const error = resumoError || ga4Error || consolidadoError
+  const loading = shareLoading
+  const error = shareError
 
   // Ícones para diferentes plataformas
   const getPlatformIcon = (platform: string) => {
@@ -83,6 +98,7 @@ const EstrategiaOnline: React.FC = () => {
       BAND: <Radio className="w-5 h-5" />,
       "BRASIL 247": <Eye className="w-5 h-5" />,
       "PORTAL FORUM": <Eye className="w-5 h-5" />,
+      "SUA MUSICA": <Volume2 className="w-5 h-5" />,
     }
     return iconMap[platform.toUpperCase()] || <Globe className="w-5 h-5" />
   }
@@ -108,189 +124,145 @@ const EstrategiaOnline: React.FC = () => {
       BAND: "#ffd700",
       "BRASIL 247": "#ff4500",
       "PORTAL FORUM": "#8b4513",
+      "SUA MUSICA": "#1DB954",
     }
     return colorMap[platform.toUpperCase()] || "#6366f1"
   }
 
   // Função para obter cor do pacing (amarelo baixo → azul alto)
   const getPacingColor = (pacing: number) => {
-    // Normalizar pacing para 0-1 (0% = 0, 100% = 1)
     const normalizedPacing = Math.min(Math.max(pacing / 100, 0), 1)
-
-    // Cores: amarelo (#fbbf24) para baixo, azul (#3b82f6) para alto
     const yellow = { r: 251, g: 191, b: 36 }
     const blue = { r: 59, g: 130, b: 246 }
-
-    // Interpolação linear entre as cores
     const r = Math.round(yellow.r + (blue.r - yellow.r) * normalizedPacing)
     const g = Math.round(yellow.g + (blue.g - yellow.g) * normalizedPacing)
     const b = Math.round(yellow.b + (blue.b - yellow.b) * normalizedPacing)
-
     return `rgb(${r}, ${g}, ${b})`
+  }
+
+  // Função para converter string monetária em número
+  const parseMonetaryValue = (value: string): number => {
+    if (!value || value === "R$ 0,00") return 0
+    return Number.parseFloat(value.replace("R$", "").replace(/\s/g, "").replace(/\./g, "").replace(",", ".")) || 0
+  }
+
+  // Função para converter string de porcentagem em número
+  const parsePercentageValue = (value: string): number => {
+    if (!value || value === "0,00%") return 0
+    return Number.parseFloat(value.replace("%", "").replace(",", ".")) || 0
   }
 
   // Processar dados da API
   useEffect(() => {
-    if (resumoData?.values) {
-      const headers = resumoData.values[0]
-      const rows = resumoData.values.slice(1)
+    if (shareData?.values) {
+      const headers = shareData.values[0]
+      const rows = shareData.values.slice(1)
 
       const processed: VehicleData[] = rows
         .map((row: any[]) => {
-          const parseValue = (value: string) => {
-            if (!value) return 0
-            return Number.parseFloat(value.replace(/[R$\s.]/g, "").replace(",", ".")) || 0
-          }
-
-          const custoInvestido = parseValue(row[headers.indexOf("Custo Investido")])
-          const custoPrevisto = parseValue(row[headers.indexOf("Custo Previsto")])
-          const pacing = custoPrevisto > 0 ? (custoInvestido / custoPrevisto) * 100 : 0
+          const investimentoPrevisto = parseMonetaryValue(row[headers.indexOf("Investimento Previsto Líquido")])
+          const custoTotal = parseMonetaryValue(row[headers.indexOf("CUSTO TOTAL")])
+          const shareInternet = parsePercentageValue(row[headers.indexOf("Share de Internet")])
 
           return {
-            veiculo: row[headers.indexOf("Veículo")] || "",
-            dsp: row[headers.indexOf("DSP")] || "",
-            custoInvestido,
-            custoPrevisto,
-            mes: row[headers.indexOf("Mês")] || "",
-            pacing,
-            shareInvestido: 0, // Será calculado depois
-            sharePrevisto: 0, // Será calculado depois
+            plataforma: row[headers.indexOf("Plataforma")] || "",
+            investimentoPrevisto,
+            custoTotal,
+            shareInternet,
+            shareInvestimentoTotal: parsePercentageValue(row[headers.indexOf("Share do investimento total")]),
+            praca: row[headers.indexOf("Praça")] || "",
+            usoEstrategico: row[headers.indexOf("Uso Estratégico")] || "",
+            shareInvestimentoUtilizado: parsePercentageValue(row[headers.indexOf("Share do investimento o utilizado")]),
+            totalPrevisto: parseMonetaryValue(row[headers.indexOf("Total Previsto")]),
+            custoUtilizado: parseMonetaryValue(row[headers.indexOf("CUSTO utilizado")]),
+            shareTotal: parsePercentageValue(row[headers.indexOf("Share do Total")]),
           }
         })
-        .filter((vehicle: VehicleData) => vehicle.veiculo)
+        .filter((vehicle: VehicleData) => vehicle.plataforma && vehicle.praca)
 
-      // Calcular totais por mês
-      const monthTotals: Record<string, MonthlyTotals> = {}
+      // Calcular totais por praça
+      const pracaMap: Record<string, PracaTotals> = {}
       processed.forEach((vehicle) => {
-        if (!monthTotals[vehicle.mes]) {
-          monthTotals[vehicle.mes] = {
-            mes: vehicle.mes,
+        if (!pracaMap[vehicle.praca]) {
+          pracaMap[vehicle.praca] = {
+            praca: vehicle.praca,
             totalInvestido: 0,
             totalPrevisto: 0,
             pacing: 0,
           }
         }
-        monthTotals[vehicle.mes].totalInvestido += vehicle.custoInvestido
-        monthTotals[vehicle.mes].totalPrevisto += vehicle.custoPrevisto
+        pracaMap[vehicle.praca].totalInvestido += vehicle.custoTotal
+        pracaMap[vehicle.praca].totalPrevisto += vehicle.investimentoPrevisto
       })
 
-      // Calcular pacing dos totais mensais
-      Object.values(monthTotals).forEach((month) => {
-        month.pacing = month.totalPrevisto > 0 ? (month.totalInvestido / month.totalPrevisto) * 100 : 0
+      // Calcular pacing das praças
+      Object.values(pracaMap).forEach((praca) => {
+        praca.pacing = praca.totalPrevisto > 0 ? (praca.totalInvestido / praca.totalPrevisto) * 100 : 0
       })
 
-      setMonthlyTotals(Object.values(monthTotals))
-
-      // Calcular shares
-      const totalGeralInvestido = processed.reduce((sum, v) => sum + v.custoInvestido, 0)
-      const totalGeralPrevisto = processed.reduce((sum, v) => sum + v.custoPrevisto, 0)
-
-      processed.forEach((vehicle) => {
-        vehicle.shareInvestido = totalGeralInvestido > 0 ? (vehicle.custoInvestido / totalGeralInvestido) * 100 : 0
-        vehicle.sharePrevisto = totalGeralPrevisto > 0 ? (vehicle.custoPrevisto / totalGeralPrevisto) * 100 : 0
-      })
-
+      setPracaTotals(Object.values(pracaMap))
       setVehicleData(processed)
 
-      // Extrair meses únicos
-      const months = Array.from(new Set(processed.map((item) => item.mes)))
+      // Extrair praças únicas
+      const pracas = Array.from(new Set(processed.map((item) => item.praca)))
         .filter(Boolean)
         .sort()
-      setAvailableMonths(months)
+      setAvailablePracas(pracas)
 
       // Calcular resumo da campanha
+      const totalGeralPrevisto = processed.reduce((sum, v) => sum + v.investimentoPrevisto, 0)
+      const totalGeralInvestido = processed.reduce((sum, v) => sum + v.custoTotal, 0)
+
       const summary: CampaignSummary = {
         totalInvestimentoPrevisto: totalGeralPrevisto,
         totalCustoInvestido: totalGeralInvestido,
-        impressoesTotais: 0, // Será calculado dos dados consolidados
-        cliquesTotais: 0, // Será calculado dos dados consolidados
-        sessoesTotais: 0, // Será calculado dos dados do GA4
+        impressoesTotais: 0, // Dados não disponíveis no JSON atual
+        cliquesTotais: 0, // Dados não disponíveis no JSON atual
+        sessoesTotais: 0, // Dados não disponíveis no JSON atual
         vtr: 85, // Valor exemplo
-      }
-
-      // Processar dados do GA4 para sessões
-      if (ga4Data?.values) {
-        const ga4Headers = ga4Data.values[0]
-        const ga4Rows = ga4Data.values.slice(1)
-
-        const sessionsIndex = ga4Headers.indexOf("Sessions")
-        if (sessionsIndex !== -1) {
-          summary.sessoesTotais = ga4Rows.reduce((sum: number, row: any[]) => {
-            const sessions = Number.parseInt(row[sessionsIndex]?.toString().replace(/\./g, "").replace(/,/g, "") || "0")
-            return sum + sessions
-          }, 0)
-        }
-      }
-
-      // Processar dados consolidados para impressões e cliques
-      if (consolidadoData?.values) {
-        const consolidadoHeaders = consolidadoData.values[0]
-        const consolidadoRows = consolidadoData.values.slice(1)
-
-        const impressionsIndex = consolidadoHeaders.indexOf("Impressions")
-        const clicksIndex = consolidadoHeaders.indexOf("Clicks")
-
-        if (impressionsIndex !== -1) {
-          summary.impressoesTotais = consolidadoRows.reduce((sum: number, row: any[]) => {
-            const impressions = Number.parseInt(
-              row[impressionsIndex]?.toString().replace(/\./g, "").replace(/,/g, "") || "0",
-            )
-            return sum + impressions
-          }, 0)
-        }
-
-        if (clicksIndex !== -1) {
-          summary.cliquesTotais = consolidadoRows.reduce((sum: number, row: any[]) => {
-            const clicks = Number.parseInt(row[clicksIndex]?.toString().replace(/\./g, "").replace(/,/g, "") || "0")
-            return sum + clicks
-          }, 0)
-        }
       }
 
       setCampaignSummary(summary)
     }
-  }, [resumoData, ga4Data, consolidadoData])
+  }, [shareData])
 
-  // Dados agregados por veículo para a tabela
+  // Dados agregados por plataforma para a tabela
   const aggregatedVehicleData = useMemo(() => {
-    const filteredData = selectedMonth ? vehicleData.filter((vehicle) => vehicle.mes === selectedMonth) : vehicleData
+    const filteredData = selectedPraca ? vehicleData.filter((vehicle) => vehicle.praca === selectedPraca) : vehicleData
 
     const aggregated: Record<string, AggregatedVehicleData> = {}
 
     filteredData.forEach((vehicle) => {
-      if (!aggregated[vehicle.veiculo]) {
-        aggregated[vehicle.veiculo] = {
-          veiculo: vehicle.veiculo,
-          custoInvestido: 0,
-          custoPrevisto: 0,
+      if (!aggregated[vehicle.plataforma]) {
+        aggregated[vehicle.plataforma] = {
+          plataforma: vehicle.plataforma,
+          investimentoPrevisto: 0,
+          custoTotal: 0,
           pacing: 0,
-          shareInvestido: 0,
-          sharePrevisto: 0,
+          shareInvestimentoTotal: 0,
+          shareInternet: 0,
+          usoEstrategico: vehicle.usoEstrategico,
         }
       }
 
-      aggregated[vehicle.veiculo].custoInvestido += vehicle.custoInvestido
-      aggregated[vehicle.veiculo].custoPrevisto += vehicle.custoPrevisto
+      aggregated[vehicle.plataforma].investimentoPrevisto += vehicle.investimentoPrevisto
+      aggregated[vehicle.plataforma].custoTotal += vehicle.custoTotal
+      aggregated[vehicle.plataforma].shareInvestimentoTotal += vehicle.shareInvestimentoTotal
+      aggregated[vehicle.plataforma].shareInternet += vehicle.shareInternet
     })
 
-    // Calcular totais para shares
-    const totalInvestido = Object.values(aggregated).reduce((sum, v) => sum + v.custoInvestido, 0)
-    const totalPrevisto = Object.values(aggregated).reduce((sum, v) => sum + v.custoPrevisto, 0)
-
-    // Calcular pacing e shares
+    // Calcular pacing
     Object.values(aggregated).forEach((vehicle) => {
-      vehicle.pacing = vehicle.custoPrevisto > 0 ? (vehicle.custoInvestido / vehicle.custoPrevisto) * 100 : 0
-      vehicle.shareInvestido = totalInvestido > 0 ? (vehicle.custoInvestido / totalInvestido) * 100 : 0
-      vehicle.sharePrevisto = totalPrevisto > 0 ? (vehicle.custoPrevisto / totalPrevisto) * 100 : 0
+      vehicle.pacing = vehicle.investimentoPrevisto > 0 ? (vehicle.custoTotal / vehicle.investimentoPrevisto) * 100 : 0
     })
 
-    return Object.values(aggregated).sort((a, b) => b.custoPrevisto - a.custoPrevisto)
-  }, [vehicleData, selectedMonth])
+    return Object.values(aggregated).sort((a, b) => b.investimentoPrevisto - a.investimentoPrevisto)
+  }, [vehicleData, selectedPraca])
 
   // Calcular totais filtrados
   const filteredTotals = useMemo(() => {
-    const totalInvestido = aggregatedVehicleData.reduce((sum, v) => sum + v.custoInvestido, 0)
-    const totalPrevisto = aggregatedVehicleData.reduce((sum, v) => sum + v.custoPrevisto, 0)
+    const totalInvestido = aggregatedVehicleData.reduce((sum, v) => sum + v.custoTotal, 0)
+    const totalPrevisto = aggregatedVehicleData.reduce((sum, v) => sum + v.investimentoPrevisto, 0)
     const pacing = totalPrevisto > 0 ? (totalInvestido / totalPrevisto) * 100 : 0
 
     return { totalInvestido, totalPrevisto, pacing }
@@ -339,10 +311,10 @@ const EstrategiaOnline: React.FC = () => {
             <h1 className="text-3xl font-bold text-gray-900 text-enhanced">Estratégia Online</h1>
             <div className="flex items-center space-x-2 text-gray-600">
               <div className="flex items-center space-x-1">
-                <Globe className="w-4 h-4" />
-                <span className="text-sm font-medium">Internet</span>
+                <MapPin className="w-4 h-4" />
+                <span className="text-sm font-medium">Por Praças</span>
               </div>
-              <span className="text-sm">• Massiva</span>
+              <span className="text-sm">• Campanha CCBB</span>
             </div>
           </div>
         </div>
@@ -351,99 +323,93 @@ const EstrategiaOnline: React.FC = () => {
         </div>
       </div>
 
-      {/* Cards Principais - Nova Ordem */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Impressões */}
+      {/* Cards Principais */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Investimento Previsto */}
         <div className="card-overlay rounded-lg shadow-lg p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Impressões</p>
-              <p className="text-xl font-bold text-gray-900">{formatNumber(campaignSummary.impressoesTotais)}</p>
+              <p className="text-sm font-medium text-gray-600">Investimento Previsto</p>
+              <p className="text-xl font-bold text-gray-900">
+                {formatCurrency(campaignSummary.totalInvestimentoPrevisto)}
+              </p>
             </div>
-            <Eye className="w-8 h-8 text-blue-600" />
+            <BarChart3 className="w-8 h-8 text-blue-600" />
           </div>
         </div>
 
-        {/* Cliques */}
+        {/* Custo Realizado */}
         <div className="card-overlay rounded-lg shadow-lg p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Cliques</p>
-              <p className="text-xl font-bold text-gray-900">{formatNumber(campaignSummary.cliquesTotais)}</p>
+              <p className="text-sm font-medium text-gray-600">Custo Realizado</p>
+              <p className="text-xl font-bold text-gray-900">{formatCurrency(campaignSummary.totalCustoInvestido)}</p>
             </div>
             <MousePointer className="w-8 h-8 text-purple-600" />
           </div>
         </div>
 
-        {/* Sessões */}
+        {/* Pacing Geral */}
         <div className="card-overlay rounded-lg shadow-lg p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Sessões</p>
-              <p className="text-xl font-bold text-gray-900">{formatNumber(campaignSummary.sessoesTotais)}</p>
+              <p className="text-sm font-medium text-gray-600">Pacing Geral</p>
+              <p className="text-xl font-bold text-gray-900">
+                {((campaignSummary.totalCustoInvestido / campaignSummary.totalInvestimentoPrevisto) * 100).toFixed(1)}%
+              </p>
             </div>
             <Users className="w-8 h-8 text-green-600" />
           </div>
         </div>
 
-        {/* Realizado (Dinâmico) */}
+        {/* Praças Ativas */}
         <div className="card-overlay rounded-lg shadow-lg p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Realizado {selectedMonth && `(${selectedMonth})`}</p>
-              <p className="text-xl font-bold text-gray-900">{filteredTotals.pacing.toFixed(2)}%</p>
+              <p className="text-sm font-medium text-gray-600">Praças Ativas</p>
+              <p className="text-xl font-bold text-gray-900">{availablePracas.length}</p>
             </div>
-            <BarChart3 className="w-8 h-8 text-orange-600" />
-          </div>
-        </div>
-
-        {/* Valor Total */}
-        <div className="lg:col-span-1 card-overlay rounded-lg shadow-lg p-4 bg-gradient-to-r from-green-50 to-blue-50">
-          <div className="text-center">
-            <p className="text-sm font-medium text-gray-600 mb-1">Investimento Líquido da Campanha</p>
-            <p className="text-2xl font-bold text-green-600">
-              {formatCurrency(campaignSummary.totalInvestimentoPrevisto)}
-            </p>
+            <MapPin className="w-8 h-8 text-orange-600" />
           </div>
         </div>
       </div>
 
-      {/* Resumo por Mês - Cards Clicáveis */}
+      {/* Resumo por Praça - Cards Clicáveis */}
       <div className="card-overlay rounded-lg shadow-lg p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Resumo por Mês</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {monthlyTotals.map((month, index) => (
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Resumo por Praça</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {pracaTotals.map((praca, index) => (
             <div
               key={index}
               className={`rounded-lg p-4 cursor-pointer transition-all duration-200 ${
-                selectedMonth === month.mes
+                selectedPraca === praca.praca
                   ? "bg-blue-100 border-2 border-blue-500 shadow-md"
                   : "bg-gray-50 border-2 border-transparent hover:bg-gray-100 hover:shadow-sm"
               }`}
-              onClick={() => setSelectedMonth(selectedMonth === month.mes ? null : month.mes)}
+              onClick={() => setSelectedPraca(selectedPraca === praca.praca ? null : praca.praca)}
             >
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">{month.mes}</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">{praca.praca}</h3>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Previsto:</span>
-                  <span className="font-medium">{formatCurrency(month.totalPrevisto)}</span>
+                  <span className="font-medium">{formatCurrency(praca.totalPrevisto)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Investido:</span>
-                  <span className="font-medium">{formatCurrency(month.totalInvestido)}</span>
+                  <span className="text-gray-600">Realizado:</span>
+                  <span className="font-medium">{formatCurrency(praca.totalInvestido)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Pacing:</span>
-                  <span className="font-semibold" style={{ color: getPacingColor(month.pacing) }}>
-                    {month.pacing.toFixed(1)}%
+                  <span className="font-semibold" style={{ color: getPacingColor(praca.pacing) }}>
+                    {praca.pacing.toFixed(1)}%
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
                   <div
                     className="h-2 rounded-full transition-all duration-500"
                     style={{
-                      width: `${Math.min(month.pacing, 100)}%`,
-                      backgroundColor: getPacingColor(month.pacing),
+                      width: `${Math.min(praca.pacing, 100)}%`,
+                      backgroundColor: getPacingColor(praca.pacing),
                     }}
                   />
                 </div>
@@ -451,45 +417,38 @@ const EstrategiaOnline: React.FC = () => {
             </div>
           ))}
         </div>
-        {selectedMonth && (
+        {selectedPraca && (
           <div className="mt-4 text-center">
             <button
-              onClick={() => setSelectedMonth(null)}
+              onClick={() => setSelectedPraca(null)}
               className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 underline"
             >
-              Limpar seleção (ver todos os meses)
+              Limpar seleção (ver todas as praças)
             </button>
           </div>
         )}
       </div>
 
-      {/* Tabela de Veículos Agregados */}
+      {/* Tabela de Plataformas Agregadas */}
       <div className="flex-1 card-overlay rounded-lg shadow-lg p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-gray-900">
-            Estratégia e Execução {selectedMonth && `- ${selectedMonth}`}
+            Estratégia e Execução {selectedPraca && `- ${selectedPraca}`}
           </h2>
           <div className="text-sm text-gray-500">
-            {selectedMonth ? `Dados do mês de ${selectedMonth}` : "Dados agregados de todos os meses"}
+            {selectedPraca ? `Dados da praça ${selectedPraca}` : "Dados agregados de todas as praças"}
           </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full table-fixed">
-            {" "}
-            {/* Adicionado table-fixed */}
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 font-semibold text-gray-700 w-[20%]">Veículo</th>{" "}
-                {/* Largura percentual */}
-                <th className="text-right py-3 px-4 font-semibold text-gray-700 w-[18%]">Orçamento Previsto</th>{" "}
-                {/* Largura percentual */}
-                <th className="text-center py-3 px-4 font-semibold text-gray-700 w-[12%]">Share (%)</th>{" "}
-                {/* Largura percentual */}
-                <th className="text-right py-3 px-4 font-semibold text-gray-700 w-[18%]">Orçamento Realizado</th>{" "}
-                {/* Largura percentual */}
-                <th className="text-center py-3 px-4 font-semibold text-gray-700 w-[32%]">Pacing</th>{" "}
-                {/* Largura percentual maior */}
+                <th className="text-left py-3 px-4 font-semibold text-gray-700 w-[20%]">Plataforma</th>
+                <th className="text-right py-3 px-4 font-semibold text-gray-700 w-[18%]">Investimento Previsto</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700 w-[12%]">Share (%)</th>
+                <th className="text-right py-3 px-4 font-semibold text-gray-700 w-[18%]">Custo Realizado</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700 w-[32%]">Pacing</th>
               </tr>
             </thead>
             <tbody>
@@ -499,28 +458,29 @@ const EstrategiaOnline: React.FC = () => {
                     <div className="flex items-center space-x-3">
                       <div
                         className="p-2 rounded-lg"
-                        style={{ backgroundColor: `${getPlatformColor(vehicle.veiculo)}20` }}
+                        style={{ backgroundColor: `${getPlatformColor(vehicle.plataforma)}20` }}
                       >
-                        <div style={{ color: getPlatformColor(vehicle.veiculo) }}>
-                          {getPlatformIcon(vehicle.veiculo)}
+                        <div style={{ color: getPlatformColor(vehicle.plataforma) }}>
+                          {getPlatformIcon(vehicle.plataforma)}
                         </div>
                       </div>
-                      <span className="font-medium text-gray-900">{vehicle.veiculo}</span>
+                      <div>
+                        <span className="font-medium text-gray-900">{vehicle.plataforma}</span>
+                        <div className="text-xs text-gray-500">{vehicle.usoEstrategico}</div>
+                      </div>
                     </div>
                   </td>
                   <td className="py-4 px-4 text-right">
-                    <span className="font-semibold text-gray-900">{formatCurrency(vehicle.custoPrevisto)}</span>
+                    <span className="font-semibold text-gray-900">{formatCurrency(vehicle.investimentoPrevisto)}</span>
                   </td>
                   <td className="py-4 px-4 text-center">
-                    <span className="text-gray-700">{vehicle.sharePrevisto.toFixed(2)}%</span>
+                    <span className="text-gray-700">{vehicle.shareInvestimentoTotal.toFixed(2)}%</span>
                   </td>
                   <td className="py-4 px-4 text-right">
-                    <span className="font-semibold text-gray-900">{formatCurrency(vehicle.custoInvestido)}</span>
+                    <span className="font-semibold text-gray-900">{formatCurrency(vehicle.custoTotal)}</span>
                   </td>
                   <td className="py-4 px-4">
                     <div className="flex items-center space-x-3 w-full">
-                      {" "}
-                      {/* Adicionado w-full */}
                       <div className="flex-1 bg-gray-200 rounded-full h-3 relative overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all duration-500"
@@ -576,20 +536,18 @@ const EstrategiaOnline: React.FC = () => {
           <h3 className="font-semibold text-gray-900 mb-2">Observações Importantes:</h3>
           <ul className="text-sm text-gray-700 space-y-1">
             <li>
-              • Dados de resultados apresentados, podendo sofrer alterações para mais ou para menos após finalização da
-              campanha.
+              • Dados de resultados apresentados por praça, podendo sofrer alterações para mais ou para menos após
+              finalização da campanha.
             </li>
             <li>
               • Por integração não sendo 100% compatível com as diversas plataformas de entrega, há diferenças entre os
               criativos e o valor de todos os veículos.
             </li>
             <li>
-              • Imagens dos dados de acompanhamento da mídia são diferentes na agenda mensal, não são os mesmos exibidos
-              na campanha.
+              • Dados de acompanhamento da mídia são diferentes na agenda mensal, não são os mesmos exibidos na
+              campanha.
             </li>
-            <li>
-              • Dados de veículos são atualizados mensalmente todas as segundas-feiras de acordo com dados internos.
-            </li>
+            <li>• Dados de veículos são atualizados semanalmente de acordo com dados internos das plataformas.</li>
           </ul>
         </div>
 

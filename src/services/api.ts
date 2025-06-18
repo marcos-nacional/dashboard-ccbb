@@ -25,7 +25,7 @@ api.interceptors.response.use(
 // Função para buscar dados consolidados dos cartões
 export const fetchConsolidadoData = async () => {
   try {
-    const response = await api.get("/cartao/consolidado")
+    const response = await api.get("/ccbb")
     return response.data
   } catch (error) {
     console.error("Erro ao buscar dados consolidados:", error)
@@ -106,18 +106,7 @@ export const fetchShareCCBBData = async () => {
     const response = await api.get("/ShareCcbb")
     return response.data
   } catch (error) {
-    console.error("Erro ao buscar dados do Share CCBB:", error)
-    throw error
-  }
-}
-
-// Função para buscar dados do Meta CCBB
-export const fetchMetaCCBBData = async () => {
-  try {
-    const response = await api.get("/ccbbMeta")
-    return response.data
-  } catch (error) {
-    console.error("Erro ao buscar dados do Meta CCBB:", error)
+    console.error("Erro ao buscar dados do CCBB:", error)
     throw error
   }
 }
@@ -155,28 +144,6 @@ export const fetchGA4ResumoData = async () => {
     return response.data
   } catch (error) {
     console.error("Erro ao buscar dados do GA4 resumo:", error)
-    throw error
-  }
-}
-
-// Função para buscar dados do GA4 completo
-export const fetchGA4CompletoData = async () => {
-  try {
-    const response = await api.get("/cartao/ga4-completo")
-    return response.data
-  } catch (error) {
-    console.error("Erro ao buscar dados do GA4 completo:", error)
-    throw error
-  }
-}
-
-// Função para buscar dados de imagem do Pinterest
-export const fetchPinterestImageData = async () => {
-  try {
-    const response = await api.get("/cartao/pinterest-imagem")
-    return response.data
-  } catch (error) {
-    console.error("Erro ao buscar dados de imagem do Pinterest:", error)
     throw error
   }
 }
@@ -338,6 +305,17 @@ export const useShareCCBBData = () => {
   return { data, loading, error, refetch: loadData }
 }
 
+// Função para buscar dados do Meta CCBB
+export const fetchMetaCCBBData = async () => {
+  try {
+    const response = await api.get("/cartao/meta")
+    return response.data
+  } catch (error) {
+    console.error("Erro ao buscar dados do Meta:", error)
+    throw error
+  }
+}
+
 // Hook personalizado para usar os dados da API Meta CCBB
 export const useMetaCCBBData = () => {
   const [data, setData] = React.useState<any>(null)
@@ -419,84 +397,6 @@ export const useGA4ResumoData = () => {
     try {
       setLoading(true)
       const result = await fetchGA4ResumoData()
-      setData(result)
-      setError(null)
-    } catch (err) {
-      setError(err as Error)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  React.useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  return { data, loading, error, refetch: loadData }
-}
-
-// Hook para dados GA4 Completo (substituir completamente)
-export const useGA4CompletoData = () => {
-  const [data, setData] = useState<GA4CompletoData | null>(null)
-  const [loading, setLoading] = useState<boolean>(true)
-  const [error, setError] = useState<Error | null>(null)
-
-  const loadData = React.useCallback(async () => {
-    try {
-      setLoading(true)
-      const result = await fetchGA4CompletoData()
-      setData(result)
-      setError(null)
-    } catch (err) {
-      setError(err as Error)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  React.useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  return { data, loading, error, refetch: loadData }
-}
-
-// Hook para dados do Pinterest (substituir completamente)
-export const useCartaoPinterestData = () => {
-  const [data, setData] = useState<CartaoPinterestData | null>(null)
-  const [loading, setLoading] = useState<boolean>(true)
-  const [error, setError] = useState<Error | null>(null)
-
-  const loadData = React.useCallback(async () => {
-    try {
-      setLoading(true)
-      const result = await fetchCartaoPinterestData()
-      setData(result)
-      setError(null)
-    } catch (err) {
-      setError(err as Error)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  React.useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  return { data, loading, error, refetch: loadData }
-}
-
-// Hook para dados de Imagem do Pinterest (substituir completamente)
-export const usePinterestImageData = () => {
-  const [data, setData] = useState<PinterestImageData | null>(null)
-  const [loading, setLoading] = useState<boolean>(true)
-  const [error, setError] = useState<Error | null>(null)
-
-  const loadData = React.useCallback(async () => {
-    try {
-      setLoading(true)
-      const result = await fetchPinterestImageData()
       setData(result)
       setError(null)
     } catch (err) {

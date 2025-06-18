@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useMemo } from "react"
-import { Users, Calendar, Filter, ShoppingCart, Info } from "lucide-react"
+import { Users, Calendar, Filter, Info, MapPin } from "lucide-react"
 import { useConsolidadoData } from "../../services/api"
 import Loading from "../../components/Loading/Loading"
 
@@ -20,7 +20,7 @@ interface ProcessedData {
   visualizacoes100: number
   cpv: number
   vtr100: number
-  tipoCompra: string
+  praca: string // Adicionando praça diretamente nos dados processados
 }
 
 interface PlatformMetrics {
@@ -37,7 +37,6 @@ interface PlatformMetrics {
   vtr100: number
   color: string
   percentage: number
-  tiposCompra: string[]
 }
 
 const Alcance: React.FC = () => {
@@ -45,9 +44,9 @@ const Alcance: React.FC = () => {
   const [processedData, setProcessedData] = useState<ProcessedData[]>([])
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: "", end: "" })
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
-  const [selectedTiposCompra, setSelectedTiposCompra] = useState<string[]>([])
   const [availablePlatforms, setAvailablePlatforms] = useState<string[]>([])
-  const [availableTiposCompra, setAvailableTiposCompra] = useState<string[]>([])
+  const [selectedPracas, setSelectedPracas] = useState<string[]>([])
+  const [availablePracas, setAvailablePracas] = useState<string[]>([])
 
   // Cores para as plataformas
   const platformColors: Record<string, string> = {
@@ -74,120 +73,121 @@ const Alcance: React.FC = () => {
     Default: "#6366f1",
   }
 
-  // Cores para tipos de compra
-  const tipoCompraColors: Record<string, string> = {
-    CPM: "#3B82F6", // Azul
-    CPC: "#10B981", // Verde
-    CPV: "#F59E0B", // Amarelo/Laranja
-    Default: "#6B7280", // Cinza
-  }
-
   // Processar dados da API
   useEffect(() => {
-    if (apiData?.values) {
-      const headers = apiData.values[0]
-      const rows = apiData.values.slice(1)
+    if (apiData?.values && apiData.values.length > 1) {
+      try {
+        const headers = apiData.values[0]
+        const rows = apiData.values.slice(1)
 
-      const processed: ProcessedData[] = rows
-        .map((row: string[]) => {
-          const parseNumber = (value: string) => {
-            if (!value) return 0
-            return Number.parseFloat(value.replace(/[R$\s.]/g, "").replace(",", ".")) || 0
-          }
+        // Verificar se os headers necessários existem
+        const requiredHeaders = ["Date", "Plataforma", "Campaign name", "Impressions", "Cost", "Reach", "Link clicks", "Frequência", "CPM", "Visualizações de vídeo a 100%", "CPV", "VTR 100%", "Praça"]
+        const missingHeaders = requiredHeaders.filter(header => !headers.includes(header))
+        
+        if (missingHeaders.length > 0) {
+          console.warn("Headers ausentes:", missingHeaders)
+        }
 
-          const parseInteger = (value: string) => {
-            if (!value) return 0
-            return Number.parseInt(value.replace(/[.\s]/g, "").replace(",", "")) || 0
-          }
+        const processed: ProcessedData[] = rows
+          .map((row: string[]) => {
+            const parseNumber = (value: string) => {
+              if (!value || value === "" || value === "0") return 0
+              return Number.parseFloat(value.replace(/[R$\s.]/g, "").replace(",", ".")) || 0
+            }
 
-          return {
-            date: row[headers.indexOf("Date")] || "",
-            platform: row[headers.indexOf("Veículo")] || "Outros",
-            campaignName: row[headers.indexOf("Campaign name")] || "",
-            impressions: parseInteger(row[headers.indexOf("Impressions")]),
-            cost: parseNumber(row[headers.indexOf("Total spent")]),
-            reach: parseInteger(row[headers.indexOf("Reach")]),
-            clicks: parseInteger(row[headers.indexOf("Clicks")]),
-            frequency: parseNumber(row[headers.indexOf("Frequency")]) || 1,
-            cpm: parseNumber(row[headers.indexOf("CPM")]),
-            linkClicks: parseInteger(row[headers.indexOf("Link clicks")]),
-            visualizacoes100: parseInteger(row[headers.indexOf("Video views")]),
-            cpv: parseNumber(row[headers.indexOf("CPV")]),
-            vtr100: parseNumber(row[headers.indexOf("VTR")]),
-            tipoCompra: row[headers.indexOf("Tipo de Compra")] || "CPM",
-          } as ProcessedData
-        })
-        .filter((item: ProcessedData) => item.date && item.impressions > 0)
+            const parseInteger = (value: string) => {
+              if (!value || value === "" || value === "0") return 0
+              return Number.parseInt(value.replace(/[.\s]/g, "").replace(",", "")) || 0
+            }
 
-      setProcessedData(processed)
+            const getHeaderValue = (headerName: string) => {
+              const index = headers.indexOf(headerName)
+              return index !== -1 ? row[index] || "" : ""
+            }
 
-      // Função para converter data brasileira DD/MM/YYYY para formato ISO YYYY-MM-DD
-      const convertBrazilianDate = (dateStr: string): string => {
-        if (!dateStr) return ""
-        const [day, month, year] = dateStr.split("/")
-        return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`
-      }
-
-      // Definir range de datas inicial
-      if (processed.length > 0) {
-        const validDates = processed
-          .map((item) => convertBrazilianDate(item.date))
-          .filter(Boolean)
-          .sort()
-
-        if (validDates.length > 0) {
-          setDateRange({
-            start: validDates[0],
-            end: validDates[validDates.length - 1],
+            return {
+              date: getHeaderValue("Date"),
+              platform: getHeaderValue("Plataforma") || "Outros",
+              campaignName: getHeaderValue("Campaign name"),
+              impressions: parseInteger(getHeaderValue("Impressions")),
+              cost: parseNumber(getHeaderValue("Cost")),
+              reach: parseInteger(getHeaderValue("Reach")),
+              clicks: parseInteger(getHeaderValue("Link clicks")),
+              frequency: parseNumber(getHeaderValue("Frequência")) || 1,
+              cpm: parseNumber(getHeaderValue("CPM")),
+              linkClicks: parseInteger(getHeaderValue("Link clicks")),
+              visualizacoes100: parseInteger(getHeaderValue("Visualizações de vídeo a 100%")),
+              cpv: parseNumber(getHeaderValue("CPV")),
+              vtr100: parseNumber(getHeaderValue("VTR 100%")),
+              praca: getHeaderValue("Praça") || "Não informado", // Incluindo praça diretamente
+            } as ProcessedData
           })
+          .filter((item: ProcessedData) => item.date && item.impressions > 0)
+
+        setProcessedData(processed)
+
+        // Definir range de datas inicial
+        if (processed.length > 0) {
+          const validDates = processed
+            .map((item) => item.date)
+            .filter(Boolean)
+            .sort()
+
+          if (validDates.length > 0) {
+            setDateRange({
+              start: validDates[0],
+              end: validDates[validDates.length - 1],
+            })
+          }
         }
+
+        // Extrair plataformas únicas
+        const platformSet = new Set<string>()
+        processed.forEach((item) => {
+          if (item.platform) {
+            platformSet.add(item.platform)
+          }
+        })
+        const platforms = Array.from(platformSet).filter(Boolean)
+        setAvailablePlatforms(platforms)
+        setSelectedPlatforms([])
+
+        // Extrair praças únicas
+        const pracaSet = new Set<string>()
+        processed.forEach((item) => {
+          if (item.praca) {
+            pracaSet.add(item.praca)
+          }
+        })
+        const pracas = Array.from(pracaSet).filter(Boolean)
+        setAvailablePracas(pracas)
+        setSelectedPracas([])
+
+      } catch (error) {
+        console.error("Erro ao processar dados:", error)
       }
-
-      // Extrair plataformas únicas
-      const platformSet = new Set<string>()
-      processed.forEach((item) => {
-        if (item.platform) {
-          platformSet.add(item.platform)
-        }
-      })
-      const platforms = Array.from(platformSet).filter(Boolean)
-      setAvailablePlatforms(platforms)
-      setSelectedPlatforms([]) // Inicialmente nenhuma plataforma selecionada
-
-      // Extrair tipos de compra únicos
-      const tipoCompraSet = new Set<string>()
-      processed.forEach((item) => {
-        if (item.tipoCompra) {
-          tipoCompraSet.add(item.tipoCompra)
-        }
-      })
-      const tiposCompra = Array.from(tipoCompraSet).filter(Boolean)
-      setAvailableTiposCompra(tiposCompra)
-      setSelectedTiposCompra([]) // Inicialmente nenhum tipo selecionado
     }
   }, [apiData])
 
-  // Filtrar dados por data, plataforma e tipo de compra
+  // Filtrar dados por data e plataforma
   const filteredData = useMemo(() => {
     let filtered = processedData
-
-    // Função para converter data brasileira DD/MM/YYYY para formato ISO YYYY-MM-DD
-    const convertBrazilianDate = (dateStr: string): string => {
-      if (!dateStr) return ""
-      const [day, month, year] = dateStr.split("/")
-      return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`
-    }
 
     // Filtro por data
     if (dateRange.start && dateRange.end) {
       filtered = filtered.filter((item) => {
-        const itemDateISO = convertBrazilianDate(item.date)
+        const itemDateISO = item.date
         if (!itemDateISO) return false
 
-        const itemDate = new Date(itemDateISO)
-        const startDate = new Date(dateRange.start)
-        const endDate = new Date(dateRange.end)
-        return itemDate >= startDate && itemDate <= endDate
+        try {
+          const itemDate = new Date(itemDateISO)
+          const startDate = new Date(dateRange.start)
+          const endDate = new Date(dateRange.end)
+          return itemDate >= startDate && itemDate <= endDate
+        } catch (error) {
+          console.warn("Erro ao processar data:", itemDateISO)
+          return false
+        }
       })
     }
 
@@ -196,25 +196,13 @@ const Alcance: React.FC = () => {
       filtered = filtered.filter((item) => selectedPlatforms.includes(item.platform))
     }
 
-    // Filtro por tipo de compra
-    if (selectedTiposCompra.length > 0) {
-      filtered = filtered.filter((item) => selectedTiposCompra.includes(item.tipoCompra))
+    // Filtro por praça - Agora muito mais simples
+    if (selectedPracas.length > 0) {
+      filtered = filtered.filter((item) => selectedPracas.includes(item.praca))
     }
 
     return filtered
-  }, [processedData, dateRange, selectedPlatforms, selectedTiposCompra])
-
-  // Função para ordenar tipos de compra na ordem correta
-  const sortTiposCompra = (tipos: string[]): string[] => {
-    const ordem = ['CPM', 'CPC', 'CPV']
-    return tipos.sort((a, b) => {
-      const indexA = ordem.indexOf(a)
-      const indexB = ordem.indexOf(b)
-      if (indexA === -1) return 1
-      if (indexB === -1) return -1
-      return indexA - indexB
-    })
-  }
+  }, [processedData, dateRange, selectedPlatforms, selectedPracas])
 
   // Calcular métricas por plataforma
   const platformMetrics = useMemo(() => {
@@ -236,7 +224,6 @@ const Alcance: React.FC = () => {
           vtr100: 0,
           color: platformColors[item.platform] || platformColors.Default,
           percentage: 0,
-          tiposCompra: [],
         }
       }
 
@@ -246,11 +233,6 @@ const Alcance: React.FC = () => {
       metrics[item.platform].clicks += item.clicks
       metrics[item.platform].linkClicks += item.linkClicks
       metrics[item.platform].visualizacoes100 += item.visualizacoes100
-
-      // Adicionar tipo de compra se não existir
-      if (!metrics[item.platform].tiposCompra.includes(item.tipoCompra)) {
-        metrics[item.platform].tiposCompra.push(item.tipoCompra)
-      }
     })
 
     // Calcular médias e percentuais
@@ -259,114 +241,16 @@ const Alcance: React.FC = () => {
     Object.values(metrics).forEach((metric) => {
       const platformData = filteredData.filter((item) => item.platform === metric.platform)
       if (platformData.length > 0) {
-        metric.cpm = metric.cost / (metric.impressions / 1000)
+        metric.cpm = metric.impressions > 0 ? metric.cost / (metric.impressions / 1000) : 0
         metric.frequency = metric.reach > 0 ? metric.impressions / metric.reach : 0
         metric.cpv = metric.visualizacoes100 > 0 ? metric.cost / metric.visualizacoes100 : 0
         metric.vtr100 = metric.impressions > 0 ? (metric.visualizacoes100 / metric.impressions) * 100 : 0
         metric.percentage = totalReach > 0 ? (metric.reach / totalReach) * 100 : 0
-        // Ordenar tipos de compra
-        metric.tiposCompra = sortTiposCompra(metric.tiposCompra)
       }
     })
 
     return Object.values(metrics).sort((a, b) => b.reach - a.reach)
-  }, [filteredData])
-
-  // Calcular métricas por tipo de compra
-  const tipoCompraMetrics = useMemo(() => {
-    const metrics: Record<string, any> = {}
-
-    filteredData.forEach((item) => {
-      if (!metrics[item.tipoCompra]) {
-        metrics[item.tipoCompra] = {
-          tipoCompra: item.tipoCompra,
-          impressions: 0,
-          cost: 0,
-          reach: 0,
-          clicks: 0,
-          cpm: 0,
-          frequency: 0,
-          linkClicks: 0,
-          visualizacoes100: 0,
-          cpv: 0,
-          vtr100: 0,
-          color: tipoCompraColors[item.tipoCompra] || tipoCompraColors.Default,
-          percentage: 0,
-        }
-      }
-
-      metrics[item.tipoCompra].impressions += item.impressions
-      metrics[item.tipoCompra].cost += item.cost
-      metrics[item.tipoCompra].reach += item.reach
-      metrics[item.tipoCompra].clicks += item.clicks
-      metrics[item.tipoCompra].linkClicks += item.linkClicks
-      metrics[item.tipoCompra].visualizacoes100 += item.visualizacoes100
-    })
-
-    // Calcular médias e percentuais
-    const totalReach = Object.values(metrics).reduce((sum: any, metric: any) => sum + metric.reach, 0)
-
-    Object.values(metrics).forEach((metric: any) => {
-      const tipoCompraData = filteredData.filter((item) => item.tipoCompra === metric.tipoCompra)
-      if (tipoCompraData.length > 0) {
-        metric.cpm = metric.cost / (metric.impressions / 1000)
-        metric.frequency = metric.reach > 0 ? metric.impressions / metric.reach : 0
-        metric.cpv = metric.visualizacoes100 > 0 ? metric.cost / metric.visualizacoes100 : 0
-        metric.vtr100 = metric.impressions > 0 ? (metric.visualizacoes100 / metric.impressions) * 100 : 0
-        metric.percentage = totalReach > 0 ? (metric.reach / totalReach) * 100 : 0
-      }
-    })
-
-    return Object.values(metrics).sort((a: any, b: any) => b.reach - a.reach)
-  }, [filteredData])
-
-  // Calcular custos médios por tipo de compra
-  const custoMedioTipoCompra = useMemo(() => {
-    const custos: Record<string, { total: number; valor: number; count: number; color: string }> = {}
-
-    filteredData.forEach((item) => {
-      if (!custos[item.tipoCompra]) {
-        custos[item.tipoCompra] = {
-          total: 0,
-          valor: 0,
-          count: 0,
-          color: tipoCompraColors[item.tipoCompra] || tipoCompraColors.Default,
-        }
-      }
-
-      custos[item.tipoCompra].total += item.cost
-      custos[item.tipoCompra].count += 1
-
-      // Calcular custo médio baseado no tipo
-      let custoUnitario = 0
-      if (item.tipoCompra === 'CPM' && item.impressions > 0) {
-        custoUnitario = item.cost / (item.impressions / 1000)
-      } else if (item.tipoCompra === 'CPC' && item.clicks > 0) {
-        custoUnitario = item.cost / item.clicks
-      } else if (item.tipoCompra === 'CPV' && item.visualizacoes100 > 0) {
-        custoUnitario = item.cost / item.visualizacoes100
-      }
-
-      if (custoUnitario > 0) {
-        custos[item.tipoCompra].valor += custoUnitario
-      }
-    })
-
-    return Object.entries(custos)
-      .map(([tipo, data]) => ({
-        tipoCompra: tipo,
-        custoMedio: data.count > 0 ? data.valor / data.count : 0,
-        color: data.color,
-      }))
-      .sort((a, b) => {
-        const ordem = ['CPM', 'CPC', 'CPV']
-        const indexA = ordem.indexOf(a.tipoCompra)
-        const indexB = ordem.indexOf(b.tipoCompra)
-        if (indexA === -1) return 1
-        if (indexB === -1) return -1
-        return indexA - indexB
-      })
-  }, [filteredData])
+  }, [filteredData, platformColors])
 
   // Calcular totais
   const totals = useMemo(() => {
@@ -386,8 +270,6 @@ const Alcance: React.FC = () => {
       avgCpv: totalVisualizacoes100 > 0 ? totalInvestment / totalVisualizacoes100 : 0,
     }
   }, [filteredData])
-
-  
 
   // Função para formatar números
   const formatNumber = (value: number): string => {
@@ -421,18 +303,22 @@ const Alcance: React.FC = () => {
     })
   }
 
-  // Função para alternar seleção de tipo de compra
-  const toggleTipoCompra = (tipoCompra: string) => {
-    setSelectedTiposCompra((prev) => {
-      if (prev.includes(tipoCompra)) {
-        return prev.filter((t) => t !== tipoCompra)
+  // Função para alternar seleção de praça
+  const togglePraca = (praca: string) => {
+    setSelectedPracas((prev) => {
+      if (prev.includes(praca)) {
+        return prev.filter((p) => p !== praca)
       }
-      return [...prev, tipoCompra]
+      return [...prev, praca]
     })
   }
 
   // Componente de gráfico de barras empilhadas horizontal
-  const StackedBarChart: React.FC<{ title: string; data: any[]; dataKey?: string }> = ({ title, data, dataKey = "percentage" }) => (
+  const StackedBarChart: React.FC<{ title: string; data: any[]; dataKey?: string }> = ({
+    title,
+    data,
+    dataKey = "percentage",
+  }) => (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
       <div className="space-y-2">
@@ -461,7 +347,7 @@ const Alcance: React.FC = () => {
               }}
               title={`${item.platform || item.tipoCompra}: ${item[dataKey].toFixed(1)}%`}
             >
-              {item[dataKey] > 5 ? (item.platform || item.tipoCompra) : ""}
+              {item[dataKey] > 5 ? item.platform || item.tipoCompra : ""}
             </div>
           ))}
         </div>
@@ -473,7 +359,7 @@ const Alcance: React.FC = () => {
             </div>
           ))}
         </div>
-      </div>      
+      </div>
     </div>
   )
 
@@ -508,7 +394,9 @@ const Alcance: React.FC = () => {
                     {value > 0 && <span>{format(value)}</span>}
                   </div>
                 </div>
-                <span className="text-xs text-gray-600 text-center truncate w-full">{item.platform || item.tipoCompra}</span>
+                <span className="text-xs text-gray-600 text-center truncate w-full">
+                  {item.platform || item.tipoCompra}
+                </span>
               </div>
             )
           })}
@@ -600,29 +488,24 @@ const Alcance: React.FC = () => {
             </div>
           </div>
 
-          {/* Filtro de Tipo de Compra */}
+          {/* Filtro de Praça */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-              <ShoppingCart className="w-4 h-4 mr-2" />
-              Tipo de Compra
+              <MapPin className="w-4 h-4 mr-2" />
+              Praça
             </label>
             <div className="flex flex-wrap gap-2">
-              {availableTiposCompra.map((tipoCompra) => (
+              {availablePracas.map((praca) => (
                 <button
-                  key={tipoCompra}
-                  onClick={() => toggleTipoCompra(tipoCompra)}
+                  key={praca}
+                  onClick={() => togglePraca(praca)}
                   className={`px-3 py-1 rounded-full text-xs font-medium transition-colors duration-200 ${
-                    selectedTiposCompra.includes(tipoCompra)
-                      ? "bg-blue-100 text-blue-800 border border-blue-300"
+                    selectedPracas.includes(praca)
+                      ? "bg-green-100 text-green-800 border border-green-300"
                       : "bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200"
                   }`}
-                  style={{
-                    backgroundColor: selectedTiposCompra.includes(tipoCompra) ? tipoCompraColors[tipoCompra] + "20" : undefined,
-                    borderColor: selectedTiposCompra.includes(tipoCompra) ? tipoCompraColors[tipoCompra] : undefined,
-                    color: selectedTiposCompra.includes(tipoCompra) ? tipoCompraColors[tipoCompra] : undefined,
-                  }}
                 >
-                  {tipoCompra}
+                  {praca}
                 </button>
               ))}
             </div>
@@ -665,19 +548,9 @@ const Alcance: React.FC = () => {
           <StackedBarChart title="Investimento por Plataforma" data={platformMetrics} />
         </div>
 
-        {/* Gráfico de Investimento por Tipo de Compra */}
-        <div className="card-overlay rounded-lg shadow-lg p-6">
-          <StackedBarChart title="Investimento por Tipo de Compra" data={tipoCompraMetrics} />
-        </div>
-
         {/* Gráfico de Alcance por Plataforma */}
         <div className="card-overlay rounded-lg shadow-lg p-6">
           <VerticalBarChart title="Alcance por Plataforma" data={platformMetrics} getValue={(item) => item.reach} />
-        </div>
-
-        {/* Gráfico de Alcance por Tipo de Compra */}
-        <div className="card-overlay rounded-lg shadow-lg p-6">
-          <VerticalBarChart title="Alcance por Tipo de Compra" data={tipoCompraMetrics} getValue={(item) => item.reach} />
         </div>
 
         {/* Gráfico de Frequência por Plataforma */}
@@ -687,16 +560,6 @@ const Alcance: React.FC = () => {
             data={platformMetrics}
             getValue={(item) => item.frequency}
             format={(value) => value.toFixed(1)}
-          />
-        </div>
-
-        {/* Gráfico de Custo Médio por Tipo de Compra */}
-        <div className="card-overlay rounded-lg shadow-lg p-6">
-          <VerticalBarChart
-            title="Custo médio por Tipo de Compra"
-            data={custoMedioTipoCompra}
-            getValue={(item) => item.custoMedio}
-            format={formatCurrency}
           />
         </div>
       </div>
@@ -710,7 +573,6 @@ const Alcance: React.FC = () => {
               <tr className="bg-blue-600 text-white">
                 <th className="text-left py-3 px-4 font-semibold">#</th>
                 <th className="text-left py-3 px-4 font-semibold">Plataforma</th>
-                <th className="text-left py-3 px-4 font-semibold">Tipo de Compra</th>
                 <th className="text-right py-3 px-4 font-semibold">Investimento</th>
                 <th className="text-right py-3 px-4 font-semibold">Impressões</th>
                 <th className="text-right py-3 px-4 font-semibold">Alcance</th>
@@ -723,19 +585,6 @@ const Alcance: React.FC = () => {
                 <tr key={index} className={index % 2 === 0 ? "bg-blue-50" : "bg-white"}>
                   <td className="py-3 px-4 font-medium">{index + 1}.</td>
                   <td className="py-3 px-4 font-medium">{metric.platform}</td>
-                  <td className="py-3 px-4">
-                    <div className="flex flex-wrap gap-1">
-                      {metric.tiposCompra.map((tipo, tipoIndex) => (
-                        <span 
-                          key={tipoIndex}
-                          className="px-2 py-1 rounded-full text-xs font-medium text-white"
-                          style={{ backgroundColor: tipoCompraColors[tipo] || tipoCompraColors.Default }}
-                        >
-                          {tipo}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
                   <td className="py-3 px-4 text-right font-semibold">{formatCurrency(metric.cost)}</td>
                   <td className="py-3 px-4 text-right">{formatNumber(metric.impressions)}</td>
                   <td className="py-3 px-4 text-right">{formatNumber(metric.reach)}</td>
@@ -755,14 +604,12 @@ const Alcance: React.FC = () => {
             <Info className="w-5 h-5 text-blue-600 mt-0.5" />
           </div>
           <div>
-            <h3 className="text-sm font-medium text-blue-900 mb-1">
-              Informações sobre Alcance e Frequência
-            </h3>
+            <h3 className="text-sm font-medium text-blue-900 mb-1">Informações sobre Alcance e Frequência</h3>
             <p className="text-sm text-blue-700">
-              Os valores de <strong>alcance</strong> e <strong>frequência</strong> apresentados representam uma média aproximada dos números reais. 
-              Devido à natureza da extração diária dos dados e às limitações técnicas das plataformas, 
-              não é possível calcular com precisão absoluta esses indicadores. Os valores servem como referência 
-              para análise de tendências e comparações relativas entre diferentes períodos e veículos.
+              Os valores de <strong>alcance</strong> e <strong>frequência</strong> apresentados representam uma média
+              aproximada dos números reais. Devido à natureza da extração diária dos dados e às limitações técnicas das
+              plataformas, não é possível calcular com precisão absoluta esses indicadores. Os valores servem como
+              referência para análise de tendências e comparações relativas entre diferentes períodos e veículos.
             </p>
           </div>
         </div>

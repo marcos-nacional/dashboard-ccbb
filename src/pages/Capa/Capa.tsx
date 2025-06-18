@@ -6,16 +6,11 @@ import {
   BarChart3,
   Users,
   Eye,
-  TrendingUp,
-  Video,
   ArrowRight,
   Calendar,
   Target,
   User,
   TargetIcon as Bullseye,
-  Linkedin,
-  ImageIcon as MetaIcon,
-  PinIcon as Pinterest,
   BookOpenText,
 } from "lucide-react"
 
@@ -63,41 +58,6 @@ const navigationCards: NavigationCard[] = [
     path: "/visualizacoes",
     icon: <Eye className="w-6 h-6" />,
     color: "bg-orange-500",
-  },
-  {
-    title: "Tráfego e Engajamento",
-    description: "Análise de tráfego e interações dos usuários",
-    path: "/trafego-engajamento",
-    icon: <TrendingUp className="w-6 h-6" />,
-    color: "bg-red-500",
-  },
-  {
-    title: "Criativos - TikTok",
-    description: "Performance dos criativos na plataforma TikTok",
-    path: "/criativos-tiktok",
-    icon: <Video className="w-6 h-6" />,
-    color: "bg-pink-500",
-  },
-  {
-    title: "Criativos - Meta Ads",
-    description: "Análise dos criativos no Facebook e Instagram",
-    path: "/criativos-meta-ads",
-    icon: <MetaIcon className="w-6 h-6" />, // Ícone do Meta
-    color: "bg-blue-600",
-  },
-  {
-    title: "Criativos - Pinterest",
-    description: "Performance dos criativos na plataforma Pinterest",
-    path: "/criativos-pinterest",
-    icon: <Pinterest className="w-6 h-6" />, // Novo card para Pinterest
-    color: "bg-red-400",
-  },
-  {
-    title: "Criativos - LinkedIn",
-    description: "Performance dos criativos na plataforma LinkedIn",
-    path: "/criativos-linkedin",
-    icon: <Linkedin className="w-6 h-6" />, // Novo card para LinkedIn
-    color: "bg-blue-700",
   },
   {
     title: "Glossário",

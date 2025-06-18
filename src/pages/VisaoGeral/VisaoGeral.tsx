@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useMemo } from "react"
-import { BarChart3, Calendar } from "lucide-react"
+import { BarChart3, Calendar, Filter, MapPin } from "lucide-react"
 import { useConsolidadoData } from "../../services/api"
 import Loading from "../../components/Loading/Loading"
 
@@ -16,6 +16,7 @@ interface ProcessedData {
   clicks: number
   frequency: number
   cpm: number
+  praca: string
 }
 
 interface PlatformMetrics {
@@ -40,6 +41,7 @@ const VisaoGeral: React.FC = () => {
   const [processedData, setProcessedData] = useState<ProcessedData[]>([])
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: "", end: "" })
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
+  const [selectedPracas, setSelectedPracas] = useState<string[]>([])
 
   // Cores para as plataformas
   const platformColors: Record<string, string> = {
@@ -72,6 +74,14 @@ const VisaoGeral: React.FC = () => {
     return Array.from(platforms)
   }, [processedData])
 
+  const availablePracas = useMemo(() => {
+    const pracas = new Set<string>()
+    processedData.forEach((item) => {
+      pracas.add(item.praca)
+    })
+    return Array.from(pracas)
+  }, [processedData])
+
   const togglePlatform = (platform: string) => {
     setSelectedPlatforms((prev) => {
       if (prev.includes(platform)) {
@@ -82,11 +92,19 @@ const VisaoGeral: React.FC = () => {
     })
   }
 
-  // Função para converter data brasileira DD/MM/YYYY para formato ISO YYYY-MM-DD
-  const convertBrazilianDate = (dateStr: string): string => {
+  const togglePraca = (praca: string) => {
+    setSelectedPracas((prev) => {
+      if (prev.includes(praca)) {
+        return prev.filter((p) => p !== praca)
+      } else {
+        return [...prev, praca]
+      }
+    })
+  }
+
+  const validateAndReturnDate = (dateStr: string | undefined): string => {
     if (!dateStr) return ""
-    const [day, month, year] = dateStr.split("/")
-    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`
+    return dateStr
   }
 
   // Processar dados da API
@@ -97,26 +115,38 @@ const VisaoGeral: React.FC = () => {
 
       const processed: ProcessedData[] = rows
         .map((row: string[]) => {
-          const parseNumber = (value: string) => {
+          const parseNumber = (value: string | undefined) => {
             if (!value) return 0
             return Number.parseFloat(value.replace(/[R$\s.]/g, "").replace(",", ".")) || 0
           }
 
-          const parseInteger = (value: string) => {
+          const parseInteger = (value: string | undefined) => {
             if (!value) return 0
-            return Number.parseInt(value.replace(/[.\s]/g, "").replace(",", "")) || 0
+            return Number.parseInt(value.replace(/[.\s]/g, "")) || 0
           }
 
+          const dateIndex = headers.indexOf("Date")
+          const platformIndex = headers.indexOf("Plataforma")
+          const campaignNameIndex = headers.indexOf("Campaign name")
+          const impressionsIndex = headers.indexOf("Impressions")
+          const costIndex = headers.indexOf("Cost")
+          const reachIndex = headers.indexOf("Reach")
+          const clicksIndex = headers.indexOf("Link clicks")
+          const frequencyIndex = headers.indexOf("Frequência")
+          const cpmIndex = headers.indexOf("CPM")
+          const pracaIndex = headers.indexOf("Praça")
+
           return {
-            date: row[headers.indexOf("Date")] || "",
-            platform: row[headers.indexOf("Veículo")] || "Outros",
-            campaignName: row[headers.indexOf("Campaign name")] || "",
-            impressions: parseInteger(row[headers.indexOf("Impressions")]),
-            cost: parseNumber(row[headers.indexOf("Total spent")]),
-            reach: parseInteger(row[headers.indexOf("Reach")]),
-            clicks: parseInteger(row[headers.indexOf("Clicks")]),
-            frequency: parseNumber(row[headers.indexOf("Frequency")]) || 1,
-            cpm: parseNumber(row[headers.indexOf("CPM")]),
+            date: validateAndReturnDate(row[dateIndex]),
+            platform: row[platformIndex] || "Outros",
+            campaignName: row[campaignNameIndex] || "",
+            impressions: parseInteger(row[impressionsIndex]),
+            cost: parseNumber(row[costIndex]),
+            reach: parseInteger(row[reachIndex]),
+            clicks: parseInteger(row[clicksIndex]),
+            frequency: parseNumber(row[frequencyIndex]) || 1,
+            cpm: parseNumber(row[cpmIndex]),
+            praca: row[pracaIndex] || "N/A",
           } as ProcessedData
         })
         .filter((item: ProcessedData) => item.date && item.impressions > 0)
@@ -126,7 +156,7 @@ const VisaoGeral: React.FC = () => {
       // Definir range de datas inicial
       if (processed.length > 0) {
         const validDates = processed
-          .map((item) => convertBrazilianDate(item.date))
+          .map((item) => item.date)
           .filter(Boolean)
           .sort()
 
@@ -146,7 +176,7 @@ const VisaoGeral: React.FC = () => {
 
     return processedData
       .filter((item) => {
-        const itemDateISO = convertBrazilianDate(item.date)
+        const itemDateISO = item.date
         if (!itemDateISO) return false
 
         const itemDate = new Date(itemDateISO)
@@ -155,7 +185,8 @@ const VisaoGeral: React.FC = () => {
         return itemDate >= startDate && itemDate <= endDate
       })
       .filter((item) => selectedPlatforms.length === 0 || selectedPlatforms.includes(item.platform))
-  }, [processedData, dateRange, selectedPlatforms])
+      .filter((item) => selectedPracas.length === 0 || selectedPracas.includes(item.praca))
+  }, [processedData, dateRange, selectedPlatforms, selectedPracas])
 
   // Calcular métricas por plataforma
   const platformMetrics = useMemo(() => {
@@ -201,13 +232,12 @@ const VisaoGeral: React.FC = () => {
     const clicks = filteredData.reduce((sum, item) => sum + item.clicks, 0)
     const frequency = filteredData.length > 0 && reach > 0 ? impressions / reach : 0
     const cpm = impressions > 0 ? investment / (impressions / 1000) : 0
-    const cpc = clicks > 0 ? investment / clicks : 0 // Calcular CPC
-    const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0 // Calcular CTR
+    const cpc = clicks > 0 ? investment / clicks : 0
+    const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0
 
-    // CPV e VTR são placeholders, pois os dados brutos não contêm visualizações de vídeo ou conclusões.
-    // Para valores reais, seria necessário adicionar essas métricas ao `apiData`.
-    const cpv = 0.06 // Placeholder
-    const vtr = 65 // Placeholder
+    // CPV e VTR são placeholders
+    const cpv = 0.06
+    const vtr = 65
 
     return {
       investment,
@@ -216,10 +246,10 @@ const VisaoGeral: React.FC = () => {
       clicks,
       frequency,
       cpm,
-      cpc, // Adicionar CPC
-      ctr, // Adicionar CTR
-      cpv, // Adicionar CPV placeholder
-      vtr, // Adicionar VTR placeholder
+      cpc,
+      ctr,
+      cpv,
+      vtr,
     }
   }, [filteredData])
 
@@ -292,15 +322,13 @@ const VisaoGeral: React.FC = () => {
             <div key={index} className="flex items-center space-x-3">
               <div className="w-16 text-xs text-gray-600 truncate">{item.platform}</div>
               <div className="flex-1 relative">
-                <div className="h-6 bg-gray-100 rounded">
-                  <div
-                    className="h-full rounded transition-all duration-500"
-                    style={{
-                      width: `${(item.value / maxValue) * 100}%`,
-                      backgroundColor: item.color,
-                    }}
-                  />
-                </div>
+                <div
+                  className="h-6 bg-gray-100 rounded"
+                  style={{
+                    width: `${(item.value / maxValue) * 100}%`,
+                    backgroundColor: item.color,
+                  }}
+                />
                 <div className="absolute right-2 top-0 h-6 flex items-center">
                   <span className="text-xs font-medium text-gray-700">{format(item.value)}</span>
                 </div>
@@ -322,7 +350,7 @@ const VisaoGeral: React.FC = () => {
   }> = ({ label, value, benchmark, format, isHigherBetter }) => {
     const isBetter = isHigherBetter ? value >= benchmark : value <= benchmark
     const colorClass = isBetter ? "text-green-600" : "text-red-600"
-    const arrowIcon = isBetter ? "↑" : "↓" // Seta simples para indicar direção
+    const arrowIcon = isBetter ? "↑" : "↓"
 
     return (
       <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
@@ -367,46 +395,81 @@ const VisaoGeral: React.FC = () => {
         </div>
       </div>
 
-      {/* Filtro de Data */}
+      {/* Filtros */}
       <div className="card-overlay rounded-lg shadow-lg p-4">
-        <div className="flex items-center space-x-4">
-          <label className="block text-sm font-medium text-gray-700 flex items-center">
-            <Calendar className="w-4 h-4 mr-2" />
-            Período:
-          </label>
-          <input
-            type="date"
-            value={dateRange.start}
-            onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          />
-          <span className="text-gray-500">até</span>
-          <input
-            type="date"
-            value={dateRange.end}
-            onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          />
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {availablePlatforms.map((platform) => (
-            <button
-              key={platform}
-              onClick={() => togglePlatform(platform)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors duration-200 ${
-                selectedPlatforms.includes(platform)
-                  ? "bg-blue-100 text-blue-800 border border-blue-300"
-                  : "bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200"
-              }`}
-              style={{
-                backgroundColor: selectedPlatforms.includes(platform) ? platformColors[platform] + "20" : undefined,
-                borderColor: selectedPlatforms.includes(platform) ? platformColors[platform] : undefined,
-                color: selectedPlatforms.includes(platform) ? platformColors[platform] : undefined,
-              }}
-            >
-              {platform}
-            </button>
-          ))}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Filtro de Data */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+              <Calendar className="w-4 h-4 mr-2" />
+              Período
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              />
+              <input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Filtro de Plataformas */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+              <Filter className="w-4 h-4 mr-2" />
+              Plataformas
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {availablePlatforms.map((platform) => (
+                <button
+                  key={platform}
+                  onClick={() => togglePlatform(platform)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors duration-200 ${
+                    selectedPlatforms.includes(platform)
+                      ? "bg-blue-100 text-blue-800 border border-blue-300"
+                      : "bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200"
+                  }`}
+                  style={{
+                    backgroundColor: selectedPlatforms.includes(platform) ? platformColors[platform] + "20" : undefined,
+                    borderColor: selectedPlatforms.includes(platform) ? platformColors[platform] : undefined,
+                    color: selectedPlatforms.includes(platform) ? platformColors[platform] : undefined,
+                  }}
+                >
+                  {platform}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Filtro de Praças */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+              <MapPin className="w-4 h-4 mr-2" />
+              Praças
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {availablePracas.map((praca) => (
+                <button
+                  key={praca}
+                  onClick={() => togglePraca(praca)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors duration-200 ${
+                    selectedPracas.includes(praca)
+                      ? "bg-blue-100 text-blue-800 border border-blue-300"
+                      : "bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200"
+                  }`}
+                >
+                  {praca}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -517,7 +580,7 @@ const VisaoGeral: React.FC = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default VisaoGeral
+export default VisaoGeral;

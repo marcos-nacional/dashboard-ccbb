@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useMemo } from "react"
-import { Play, Calendar, Filter, ShoppingCart, Info } from "lucide-react"
+import { Play, Calendar, Filter, ShoppingCart, MapPin, Info } from "lucide-react"
 import { useConsolidadoData } from "../../services/api"
 import Loading from "../../components/Loading/Loading"
 
@@ -26,6 +26,8 @@ interface ProcessedData {
   cpvc: number
   vtr100: number
   tipoCompra: string
+  praca: string
+  tipoFormato: string // Adicionado para filtrar melhor os tipos
 }
 
 interface PlatformMetrics {
@@ -50,6 +52,7 @@ interface PlatformMetrics {
   vtrPercentage: number
   visualizacoesPercentage: number
   tiposCompra: string[]
+  pracas: string[]
 }
 
 const Visualizacoes: React.FC = () => {
@@ -58,22 +61,24 @@ const Visualizacoes: React.FC = () => {
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: "", end: "" })
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
   const [selectedTiposCompra, setSelectedTiposCompra] = useState<string[]>([])
+  const [selectedPracas, setSelectedPracas] = useState<string[]>([])
   const [availablePlatforms, setAvailablePlatforms] = useState<string[]>([])
   const [availableTiposCompra, setAvailableTiposCompra] = useState<string[]>([])
+  const [availablePracas, setAvailablePracas] = useState<string[]>([])
 
   // Cores para as plataformas (seguindo o modelo da imagem)
   const platformColors: Record<string, string> = {
-    YouTube: "#ff6b6b", // Rosa/vermelho claro
-    TikTok: "#ff4757", // Vermelho
-    Google: "#5f27cd", // Roxo escuro
-    Netflix: "#341f97", // Roxo
-    Meta: "#74b9ff", // Azul claro
-    Spotify: "#0984e3", // Azul
-    Kwai: "#fdcb6e", // Amarelo/laranja
-    Band: "#e17055", // Laranja
-    "Catraca Livre": "#00b894", // Verde
-    "Globo.com": "#00a085", // Verde escuro
-    Pinterest: "#bd081c", // Vermelho Pinterest
+    YouTube: "#ff6b6b",
+    TikTok: "#ff4757",
+    Google: "#5f27cd",
+    Netflix: "#341f97",
+    Meta: "#74b9ff",
+    Spotify: "#0984e3",
+    Kwai: "#fdcb6e",
+    Band: "#e17055",
+    "Catraca Livre": "#00b894",
+    "Globo.com": "#00a085",
+    Pinterest: "#bd081c",
     LinkedIn: "#0077B5",
     GDN: "#34A853",
     "Demand-Gen": "#EA4335",
@@ -82,10 +87,10 @@ const Visualizacoes: React.FC = () => {
 
   // Cores para tipos de compra
   const tipoCompraColors: Record<string, string> = {
-    CPM: "#3B82F6", // Azul
-    CPC: "#10B981", // Verde
-    CPV: "#F59E0B", // Amarelo/Laranja
-    Default: "#6B7280", // Cinza
+    CPM: "#3B82F6",
+    CPC: "#10B981",
+    CPV: "#F59E0B",
+    Default: "#6B7280",
   }
 
   // Função para ordenar tipos de compra na ordem correta
@@ -100,116 +105,157 @@ const Visualizacoes: React.FC = () => {
     })
   }
 
-  // Função para converter data brasileira DD/MM/YYYY para formato ISO YYYY-MM-DD
-  const convertBrazilianDate = (dateStr: string): string => {
-    if (!dateStr) return ""
-    const [day, month, year] = dateStr.split("/")
-    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`
-  }
-
   // Processar dados da API
   useEffect(() => {
-    if (apiData?.values) {
-      const headers = apiData.values[0]
-      const rows = apiData.values.slice(1)
+    if (apiData?.values && apiData.values.length > 1) {
+      try {
+        const headers = apiData.values[0]
+        const rows = apiData.values.slice(1)
 
-      const processed: ProcessedData[] = rows
-        .map((row: string[]) => {
-          const parseNumber = (value: string) => {
-            if (!value) return 0
-            return Number.parseFloat(value.replace(/[R$\s.]/g, "").replace(",", ".")) || 0
-          }
+        // Verificar se os headers necessários existem
+        const requiredHeaders = [
+          "Date", "Plataforma", "Campaign name", "Impressions", "Cost", "Reach", "Link clicks",
+          "Frequência", "CPM", "Visualizações de vídeo a 100%", "Visualizações de vídeo a 25%",
+          "Visualizações de vídeo a 50%", "Visualizações de vídeo a 75%", "CPV", "VTR 100%",
+          "Tipo de Compra", "Praça", "Tipo de formato"
+        ]
+        
+        const missingHeaders = requiredHeaders.filter(header => !headers.includes(header))
+        if (missingHeaders.length > 0) {
+          console.warn("Headers ausentes:", missingHeaders)
+        }
 
-          const parseInteger = (value: string) => {
-            if (!value) return 0
-            return Number.parseInt(value.replace(/[.\s]/g, "").replace(",", "")) || 0
-          }
+        const processed: ProcessedData[] = rows
+          .map((row: string[]) => {
+            const parseNumber = (value: string) => {
+              if (!value || value === "" || value === "0") return 0
+              return Number.parseFloat(value.replace(/[R$\s.]/g, "").replace(",", ".")) || 0
+            }
 
-          const impressions = parseInteger(row[headers.indexOf("Impressions")])
-          const videoViews = parseInteger(row[headers.indexOf("Video views ")])
-          const videoCompletions = parseInteger(row[headers.indexOf("Video completions ")])
+            const parseInteger = (value: string) => {
+              if (!value || value === "" || value === "0") return 0
+              return Number.parseInt(value.replace(/[.\s]/g, "").replace(",", "")) || 0
+            }
 
-          return {
-            date: row[headers.indexOf("Date")] || "",
-            platform: row[headers.indexOf("Veículo")] || "Outros",
-            campaignName: row[headers.indexOf("Campaign name")] || "",
-            impressions: impressions,
-            cost: parseNumber(row[headers.indexOf("Total spent")]),
-            reach: parseInteger(row[headers.indexOf("Reach")]),
-            clicks: parseInteger(row[headers.indexOf("Clicks")]),
-            frequency: parseNumber(row[headers.indexOf("Frequency")]) || 1,
-            cpm: parseNumber(row[headers.indexOf("CPM")]),
-            linkClicks: parseInteger(row[headers.indexOf("Link clicks")]),
-            videoViews: videoViews,
-            videoViews25: parseInteger(row[headers.indexOf("Video views at 25%")]),
-            videoViews50: parseInteger(row[headers.indexOf("Video views at 50%")]),
-            videoViews75: parseInteger(row[headers.indexOf("Video views at 75%")]),
-            videoCompletions: parseInteger(row[headers.indexOf("Video completions ")]),
-            cpv:
-              parseNumber(row[headers.indexOf("CPV")]) ||
-              (videoViews > 0 ? parseNumber(row[headers.indexOf("Total spent")]) / videoViews : 0),
-            cpvc: parseNumber(row[headers.indexOf("CPVc")]) || parseNumber(row[headers.indexOf("CPV")]) * 0.8,
-            vtr100: impressions > 0 && videoCompletions > 0 ? (videoCompletions / impressions) * 100 : 0,
-            tipoCompra: row[headers.indexOf("Tipo de Compra")] || "CPM",
-          } as ProcessedData
-        })
-        .filter((item: ProcessedData) => item.date && item.impressions > 0 && item.videoViews > 0) // Filtrar apenas itens com video views
+            const getHeaderValue = (headerName: string) => {
+              const index = headers.indexOf(headerName)
+              return index !== -1 ? row[index] || "" : ""
+            }
 
-      setProcessedData(processed)
+            const impressions = parseInteger(getHeaderValue("Impressions"))
+            const videoViews = parseInteger(getHeaderValue("Visualizações de vídeo a 100%"))
+            const videoCompletions = parseInteger(getHeaderValue("Visualizações de vídeo a 100%"))
+            const cost = parseNumber(getHeaderValue("Cost"))
+            const tipoFormato = getHeaderValue("Tipo de formato")
 
-      // Definir range de datas inicial
-      if (processed.length > 0) {
-        const validDates = processed
-          .map((item) => convertBrazilianDate(item.date))
-          .filter(Boolean)
-          .sort()
-
-        if (validDates.length > 0) {
-          setDateRange({
-            start: validDates[0],
-            end: validDates[validDates.length - 1],
+            return {
+              date: getHeaderValue("Date"),
+              platform: getHeaderValue("Plataforma") || "Outros",
+              campaignName: getHeaderValue("Campaign name"),
+              impressions: impressions,
+              cost: cost,
+              reach: parseInteger(getHeaderValue("Reach")),
+              clicks: parseInteger(getHeaderValue("Link clicks")),
+              frequency: parseNumber(getHeaderValue("Frequência")) || 1,
+              cpm: parseNumber(getHeaderValue("CPM")),
+              linkClicks: parseInteger(getHeaderValue("Link clicks")),
+              videoViews: videoViews,
+              videoViews25: parseInteger(getHeaderValue("Visualizações de vídeo a 25%")),
+              videoViews50: parseInteger(getHeaderValue("Visualizações de vídeo a 50%")),
+              videoViews75: parseInteger(getHeaderValue("Visualizações de vídeo a 75%")),
+              videoCompletions: videoCompletions,
+              cpv: parseNumber(getHeaderValue("CPV")) || (videoViews > 0 ? cost / videoViews : 0),
+              cpvc: parseNumber(getHeaderValue("CPV")) || (videoCompletions > 0 ? cost / videoCompletions : 0),
+              vtr100: impressions > 0 && videoCompletions > 0 ? (videoCompletions / impressions) * 100 : 0,
+              tipoCompra: getHeaderValue("Tipo de Compra") || "CPM",
+              praca: getHeaderValue("Praça") || "Não Definida",
+              tipoFormato: tipoFormato,
+            } as ProcessedData
           })
+          .filter((item: ProcessedData) => {
+            // Filtros mais rigorosos para dados de vídeo
+            return (
+              item.date && 
+              item.impressions > 0 && 
+              item.videoViews > 0 && // Deve ter visualizações de vídeo
+              item.tipoFormato === "Vídeo" && // Deve ser do tipo Vídeo
+              ["YouTube", "TikTok", "Netflix", "Spotify"].includes(item.platform) // Apenas plataformas de vídeo
+            )
+          })
+
+        console.log("Dados processados (vídeo):", processed.length)
+        setProcessedData(processed)
+
+        // Definir range de datas inicial
+        if (processed.length > 0) {
+          const validDates = processed
+            .map((item) => item.date)
+            .filter(Boolean)
+            .sort()
+
+          if (validDates.length > 0) {
+            setDateRange({
+              start: validDates[0],
+              end: validDates[validDates.length - 1],
+            })
+          }
         }
+
+        // Extrair plataformas únicas (apenas as que têm video views)
+        const platformSet = new Set<string>()
+        processed.forEach((item) => {
+          if (item.platform && item.videoViews > 0) {
+            platformSet.add(item.platform)
+          }
+        })
+        const platforms = Array.from(platformSet).filter(Boolean)
+        setAvailablePlatforms(platforms)
+        setSelectedPlatforms([])
+
+        // Extrair tipos de compra únicos
+        const tipoCompraSet = new Set<string>()
+        processed.forEach((item) => {
+          if (item.tipoCompra) {
+            tipoCompraSet.add(item.tipoCompra)
+          }
+        })
+        const tiposCompra = Array.from(tipoCompraSet).filter(Boolean)
+        setAvailableTiposCompra(tiposCompra)
+        setSelectedTiposCompra([])
+
+        // Extrair praças únicas
+        const pracaSet = new Set<string>()
+        processed.forEach((item) => {
+          if (item.praca) {
+            pracaSet.add(item.praca)
+          }
+        })
+        const pracas = Array.from(pracaSet).filter(Boolean).sort()
+        setAvailablePracas(pracas)
+        setSelectedPracas([])
+
+      } catch (error) {
+        console.error("Erro ao processar dados:", error)
       }
-
-      // Extrair plataformas únicas (apenas as que têm video views)
-      const platformSet = new Set<string>()
-      processed.forEach((item) => {
-        if (item.platform && item.videoViews > 0) {
-          platformSet.add(item.platform)
-        }
-      })
-      const platforms = Array.from(platformSet).filter(Boolean)
-      setAvailablePlatforms(platforms)
-      setSelectedPlatforms([]) // Inicialmente nenhuma plataforma selecionada
-
-      // Extrair tipos de compra únicos
-      const tipoCompraSet = new Set<string>()
-      processed.forEach((item) => {
-        if (item.tipoCompra) {
-          tipoCompraSet.add(item.tipoCompra)
-        }
-      })
-      const tiposCompra = Array.from(tipoCompraSet).filter(Boolean)
-      setAvailableTiposCompra(tiposCompra)
-      setSelectedTiposCompra([])
     }
   }, [apiData])
 
-  // Filtrar dados por data, plataforma e tipo de compra
+  // Filtrar dados por data, plataforma, tipo de compra e praça
   const filteredData = useMemo(() => {
     let filtered = processedData
 
     // Filtro por data
     if (dateRange.start && dateRange.end) {
       filtered = filtered.filter((item) => {
-        const itemDateISO = convertBrazilianDate(item.date)
-        if (!itemDateISO) return false
-
-        const itemDate = new Date(itemDateISO)
-        const startDate = new Date(dateRange.start)
-        const endDate = new Date(dateRange.end)
-        return itemDate >= startDate && itemDate <= endDate
+        try {
+          const itemDate = new Date(item.date)
+          const startDate = new Date(dateRange.start)
+          const endDate = new Date(dateRange.end)
+          return itemDate >= startDate && itemDate <= endDate
+        } catch (error) {
+          console.warn("Erro ao processar data:", item.date)
+          return false
+        }
       })
     }
 
@@ -223,8 +269,13 @@ const Visualizacoes: React.FC = () => {
       filtered = filtered.filter((item) => selectedTiposCompra.includes(item.tipoCompra))
     }
 
+    // Filtro por praça
+    if (selectedPracas.length > 0) {
+      filtered = filtered.filter((item) => selectedPracas.includes(item.praca))
+    }
+
     return filtered
-  }, [processedData, dateRange, selectedPlatforms, selectedTiposCompra])
+  }, [processedData, dateRange, selectedPlatforms, selectedTiposCompra, selectedPracas])
 
   // Calcular métricas por plataforma
   const platformMetrics = useMemo(() => {
@@ -254,6 +305,7 @@ const Visualizacoes: React.FC = () => {
           vtrPercentage: 0,
           visualizacoesPercentage: 0,
           tiposCompra: [],
+          pracas: [],
         }
       }
 
@@ -272,31 +324,36 @@ const Visualizacoes: React.FC = () => {
       if (!metrics[item.platform].tiposCompra.includes(item.tipoCompra)) {
         metrics[item.platform].tiposCompra.push(item.tipoCompra)
       }
+      // Adicionar praça se não existir
+      if (!metrics[item.platform].pracas.includes(item.praca)) {
+        metrics[item.platform].pracas.push(item.praca)
+      }
     })
 
     // Calcular médias e percentuais
     const totalCost = Object.values(metrics).reduce((sum, metric) => sum + metric.cost, 0)
-    const totalVisualizacoes = Object.values(metrics).reduce((sum, metric) => sum + metric.videoViews, 0)
+    const totalVisualizacoes = Object.values(metrics).reduce((sum, metric) => sum + metric.videoCompletions, 0)
     const maxVtr = Math.max(...Object.values(metrics).map((m) => m.vtr100))
 
     Object.values(metrics).forEach((metric) => {
       const platformData = filteredData.filter((item) => item.platform === metric.platform)
       if (platformData.length > 0) {
-        metric.cpm = metric.cost / (metric.impressions / 1000)
+        metric.cpm = metric.impressions > 0 ? metric.cost / (metric.impressions / 1000) : 0
         metric.frequency = metric.reach > 0 ? metric.impressions / metric.reach : 0
         metric.cpv = metric.videoViews > 0 ? metric.cost / metric.videoViews : 0
-        metric.cpvc = metric.cpv * 0.8 // Estimativa
+        metric.cpvc = metric.videoCompletions > 0 ? metric.cost / metric.videoCompletions : 0
         metric.vtr100 = metric.impressions > 0 ? (metric.videoCompletions / metric.impressions) * 100 : 0
         metric.percentage = totalCost > 0 ? (metric.cost / totalCost) * 100 : 0
-        metric.visualizacoesPercentage = totalVisualizacoes > 0 ? (metric.videoViews / totalVisualizacoes) * 100 : 0
+        metric.visualizacoesPercentage = totalVisualizacoes > 0 ? (metric.videoCompletions / totalVisualizacoes) * 100 : 0
         metric.vtrPercentage = maxVtr > 0 ? (metric.vtr100 / maxVtr) * 100 : 0
         // Ordenar tipos de compra
         metric.tiposCompra = sortTiposCompra(metric.tiposCompra)
+        metric.pracas.sort()
       }
     })
 
     return Object.values(metrics).sort((a, b) => b.cost - a.cost)
-  }, [filteredData])
+  }, [filteredData, platformColors])
 
   // Calcular totais
   const totals = useMemo(() => {
@@ -305,7 +362,7 @@ const Visualizacoes: React.FC = () => {
     const totalVideoViews = filteredData.reduce((sum, item) => sum + item.videoCompletions, 0)
     const avgVtr100 = totalImpressions > 0 ? (totalVideoViews / totalImpressions) * 100 : 0
     const avgCpv = totalVideoViews > 0 ? totalInvestment / totalVideoViews : 0
-    const avgCpvc = avgCpv * 0.8
+    const avgCpvc = avgCpv // CPVc é igual ao CPV quando consideramos visualizações 100%
 
     return {
       investment: totalInvestment,
@@ -359,6 +416,16 @@ const Visualizacoes: React.FC = () => {
     })
   }
 
+  // Função para alternar seleção de praça
+  const togglePraca = (praca: string) => {
+    setSelectedPracas((prev) => {
+      if (prev.includes(praca)) {
+        return prev.filter((p) => p !== praca)
+      }
+      return [...prev, praca]
+    })
+  }
+
   // Componente de curva de retenção (agora gráfico de barras)
   const RetentionCurveChart: React.FC<{ data: PlatformMetrics[] }> = ({ data }) => {
     return (
@@ -375,33 +442,40 @@ const Visualizacoes: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {data.map((platform, index) => {
-            // Calcular percentuais de retenção
-            const retention25 = platform.videoViews > 0 ? (platform.videoViews25 / platform.videoViews) * 100 : 0
-            const retention50 = platform.videoViews > 0 ? (platform.videoViews50 / platform.videoViews) * 100 : 0
-            const retention75 = platform.videoViews > 0 ? (platform.videoViews75 / platform.videoViews) * 100 : 0
-            const retention100 = platform.videoViews > 0 ? (platform.videoCompletions / platform.videoViews) * 100 : 0
+            // Calcular percentuais de retenção baseados nas visualizações totais
+            const totalViews = Math.max(
+              platform.videoViews,
+              platform.videoViews25,
+              platform.videoViews50,
+              platform.videoViews75,
+              platform.videoCompletions
+            )
+
+            const retention25 = totalViews > 0 ? (platform.videoViews25 / totalViews) * 100 : 0
+            const retention50 = totalViews > 0 ? (platform.videoViews50 / totalViews) * 100 : 0
+            const retention75 = totalViews > 0 ? (platform.videoViews75 / totalViews) * 100 : 0
+            const retention100 = totalViews > 0 ? (platform.videoCompletions / totalViews) * 100 : 0
 
             // Determine if 25%, 50%, 75% data is all zero
-            const hasIntermediateData =
-              platform.videoViews25 > 0 || platform.videoViews50 > 0 || platform.videoViews75 > 0
+            const hasIntermediateData = platform.videoViews25 > 0 || platform.videoViews50 > 0 || platform.videoViews75 > 0
 
             const retentionPoints = hasIntermediateData
               ? [
                   { x: 0, y: 100, label: "Início" },
-                  { x: 25, y: retention25, label: "25%" },
-                  { x: 50, y: retention50, label: "50%" },
-                  { x: 75, y: retention75, label: "75%" },
-                  { x: 100, y: retention100, label: "100%" },
+                  { x: 25, y: Math.min(retention25, 100), label: "25%" },
+                  { x: 50, y: Math.min(retention50, 100), label: "50%" },
+                  { x: 75, y: Math.min(retention75, 100), label: "75%" },
+                  { x: 100, y: Math.min(retention100, 100), label: "100%" },
                 ]
               : [
                   { x: 0, y: 100, label: "Início" },
-                  { x: 100, y: retention100, label: "100%" },
+                  { x: 100, y: Math.min(retention100, 100), label: "100%" },
                 ]
 
             const chartWidth = 300
             const chartHeight = 100
-            const barWidth = hasIntermediateData ? 30 : 60 // Wider bars if only two points
-            const barSpacing = hasIntermediateData ? 20 : 100 // Adjust spacing based on number of bars
+            const barWidth = hasIntermediateData ? 30 : 60
+            const barSpacing = hasIntermediateData ? 20 : 100
             const totalBarsWidth = retentionPoints.length * barWidth + (retentionPoints.length - 1) * barSpacing
             const startX = (chartWidth - totalBarsWidth) / 2
 
@@ -451,7 +525,7 @@ const Visualizacoes: React.FC = () => {
                             x={xPos}
                             y={yPos}
                             width={barWidth}
-                            height={barHeight}
+                            height={Math.max(barHeight, 0)}
                             fill={platform.color}
                             rx="4"
                             ry="4"
@@ -463,7 +537,7 @@ const Visualizacoes: React.FC = () => {
                             className="text-xs font-medium"
                             fill={platform.color}
                           >
-                            {point.y.toFixed(2)}%
+                            {point.y.toFixed(1)}%
                           </text>
                           <text
                             x={xPos + barWidth / 2}
@@ -544,7 +618,7 @@ const Visualizacoes: React.FC = () => {
                   <div
                     className="w-full rounded-t transition-all duration-500 flex items-end justify-center text-xs font-medium text-white p-1"
                     style={{
-                      height: `${height}%`,
+                      height: `${Math.max(height, 0)}%`,
                       backgroundColor: item.color,
                       minHeight: value > 0 ? "20px" : "0",
                     }}
@@ -575,6 +649,14 @@ const Visualizacoes: React.FC = () => {
     )
   }
 
+  if (processedData.length === 0) {
+    return (
+      <div className="bg-yellow-50/90 backdrop-blur-sm border border-yellow-200 rounded-lg p-4">
+        <p className="text-yellow-800">Nenhum dado de visualização de vídeo encontrado no período selecionado.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 h-full flex flex-col">
       {/* Header */}
@@ -595,34 +677,33 @@ const Visualizacoes: React.FC = () => {
 
       {/* Filtros */}
       <div className="card-overlay rounded-lg shadow-lg p-4">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           {/* Filtro de Data */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+          <div className="flex items-center gap-2">
+            <label className="block text-sm font-medium text-gray-700 flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
-              Período
+              Período:
             </label>
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                type="date"
-                value={dateRange.start}
-                onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              />
-              <input
-                type="date"
-                value={dateRange.end}
-                onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              />
-            </div>
+            <input
+              type="date"
+              value={dateRange.start}
+              onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-auto"
+            />
+            <span className="text-sm text-gray-700">até</span>
+            <input
+              type="date"
+              value={dateRange.end}
+              onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-auto"
+            />
           </div>
 
           {/* Filtro de Plataforma */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+          <div className="flex items-center gap-2">
+            <label className="block text-sm font-medium text-gray-700 flex items-center">
               <Filter className="w-4 h-4 mr-2" />
-              Plataforma
+              Plataformas:
             </label>
             <div className="flex flex-wrap gap-2">
               {availablePlatforms.map((platform) => (
@@ -647,10 +728,10 @@ const Visualizacoes: React.FC = () => {
           </div>
 
           {/* Filtro de Tipo de Compra */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+          <div className="flex items-center gap-2">
+            <label className="block text-sm font-medium text-gray-700 flex items-center">
               <ShoppingCart className="w-4 h-4 mr-2" />
-              Tipo de Compra
+              Tipo de Compra:
             </label>
             <div className="flex flex-wrap gap-2">
               {availableTiposCompra.map((tipoCompra) => (
@@ -671,6 +752,34 @@ const Visualizacoes: React.FC = () => {
                   }}
                 >
                   {tipoCompra}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Filtro de Praça */}
+          <div className="flex items-center gap-2">
+            <label className="block text-sm font-medium text-gray-700 flex items-center">
+              <MapPin className="w-4 h-4 mr-2" />
+              Praças:
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {availablePracas.map((praca) => (
+                <button
+                  key={praca}
+                  onClick={() => togglePraca(praca)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors duration-200 ${
+                    selectedPracas.includes(praca)
+                      ? "bg-blue-100 text-blue-800 border border-blue-300"
+                      : "bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200"
+                  }`}
+                  style={{
+                    backgroundColor: selectedPracas.includes(praca) ? "#6c5ce720" : undefined,
+                    borderColor: selectedPracas.includes(praca) ? "#6c5ce7" : undefined,
+                    color: selectedPracas.includes(praca) ? "#6c5ce7" : undefined,
+                  }}
+                >
+                  {praca}
                 </button>
               ))}
             </div>
@@ -721,10 +830,11 @@ const Visualizacoes: React.FC = () => {
                 <th className="text-left py-3 px-4 font-semibold">#</th>
                 <th className="text-left py-3 px-4 font-semibold">Plataforma</th>
                 <th className="text-left py-3 px-4 font-semibold">Tipo de Compra</th>
+                <th className="text-left py-3 px-4 font-semibold">Praça</th>
                 <th className="text-right py-3 px-4 font-semibold">Investimento</th>
                 <th className="text-right py-3 px-4 font-semibold">CPM</th>
-                <th className="text-right py-3 px-4 font-semibold">CPV*</th>
-                <th className="text-right py-3 px-4 font-semibold">CPVc*</th>
+                <th className="text-right py-3 px-4 font-semibold">CPV</th>
+                <th className="text-right py-3 px-4 font-semibold">CPVc</th>
                 <th className="text-right py-3 px-4 font-semibold">VTR 100%</th>
               </tr>
             </thead>
@@ -746,6 +856,19 @@ const Visualizacoes: React.FC = () => {
                       ))}
                     </div>
                   </td>
+                  <td className="py-3 px-4">
+                    <div className="flex flex-wrap gap-1">
+                      {metric.pracas.map((praca, pracaIndex) => (
+                        <span
+                          key={pracaIndex}
+                          className="px-2 py-1 rounded-full text-xs font-medium text-white"
+                          style={{ backgroundColor: "#6c5ce7" }}
+                        >
+                          {praca}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
                   <td className="py-3 px-4 text-right font-semibold">{formatCurrency(metric.cost)}</td>
                   <td className="py-3 px-4 text-right">{formatCurrency(metric.cpm)}</td>
                   <td className="py-3 px-4 text-right">{formatCurrency(metric.cpv)}</td>
@@ -760,9 +883,9 @@ const Visualizacoes: React.FC = () => {
         {/* Observações */}
         <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
           <div className="text-sm text-gray-700">
-            <strong>*CPV:</strong> custo/visualizações 50%
+            <strong>CPV:</strong> Custo por visualização de vídeo
             <br />
-            <strong>**CPVc:</strong> custo/visualizações 100%
+            <strong>CPVc:</strong> Custo por visualização completa (100%)
           </div>
         </div>
       </div>
@@ -777,7 +900,7 @@ const Visualizacoes: React.FC = () => {
             <h3 className="text-sm font-medium text-blue-900 mb-1">Informações sobre Métricas de Vídeo</h3>
             <p className="text-sm text-blue-700">
               As métricas de <strong>visualizações</strong> e <strong>VTR</strong> são baseadas nos dados fornecidos
-              pelas plataformas. O <strong>CPV</strong> representa o custo por visualização (50% do vídeo) e o{" "}
+              pelas plataformas. O <strong>CPV</strong> representa o custo por visualização e o{" "}
               <strong>CPVc</strong> o custo por visualização completa (100%). Estes valores podem variar conforme as
               configurações de campanha e as definições específicas de cada plataforma.
             </p>
