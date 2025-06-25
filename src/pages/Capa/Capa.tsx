@@ -82,8 +82,8 @@ const Capa: React.FC = () => {
           <div className="absolute inset-0 bg-black/20"></div>
           <div className="absolute bottom-0 left-0 right-0 p-4">
             <div className="bg-white/95 backdrop-blur-sm rounded-xl p-4 shadow-lg">
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">Dashboard - Campanha Cartões</h1>
-              <p className="text-base text-gray-700">Colecione momentos • Análise completa de performance</p>
+              <h1 className="text-2xl font-bold text-gray-900 mb-1">Dashboard - Campanha CCBB</h1>
+              <p className="text-base text-gray-700">Exposição Encruzilhadas da Arte Afro-Brasileira • Análise completa de performance</p>
             </div>
           </div>
         </div>
@@ -102,22 +102,22 @@ const Capa: React.FC = () => {
               <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
               <div>
                 <p className="font-semibold text-gray-900 text-sm">Campanha:</p>
-                <p className="text-gray-700 text-sm">Cartões</p>
+                <p className="text-gray-700 text-sm">CCBB</p>
               </div>
             </div>
             <div className="flex items-start space-x-3">
               <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
               <div>
                 <p className="font-semibold text-gray-900 text-sm">Códigos</p>
-                <p className="text-gray-700 text-sm">Nº Ação: A2025/00002</p>
-                <p className="text-gray-700 text-sm">Nº Projeto: P2024/00854</p>
+                <p className="text-gray-700 text-sm">Nº Ação: A2025/00005</p>
+                <p className="text-gray-700 text-sm">Nº Projeto: P2025/00032</p>
               </div>
             </div>
             <div className="flex items-start space-x-3">
               <User className="w-3 h-3 text-purple-600 mt-1" />
               <div>
-                <p className="font-semibold text-gray-900 text-sm">Assessora:</p>
-                <p className="text-gray-700 text-sm">Isis Azevedo</p>
+                <p className="font-semibold text-gray-900 text-sm">Assessor:</p>
+                <p className="text-gray-700 text-sm">Pedro Emídio</p>
               </div>
             </div>
           </div>
@@ -134,15 +134,14 @@ const Capa: React.FC = () => {
               <Users className="w-3 h-3 text-orange-600 mt-1" />
               <div>
                 <p className="font-semibold text-gray-900 text-sm">Público Alvo:</p>
-                <p className="text-gray-700 text-sm">AS - 18 +</p>
-                <p className="text-gray-700 text-sm">AS - 18 a 40 anos + Interesses</p>
+                <p className="text-gray-700 text-sm">AS - 18 a 40 anos + Interesse</p>
               </div>
             </div>
             <div className="flex items-start space-x-3">
               <Bullseye className="w-3 h-3 text-red-600 mt-1" />
               <div>
                 <p className="font-semibold text-gray-900 text-sm">Objetivo de Campanha:</p>
-                <p className="text-gray-700 text-sm">Mercadológica - Negocial</p>
+                <p className="text-gray-700 text-sm">Campanha Mercadológica - Negocial - Segmentada</p>
               </div>
             </div>
             <div className="flex items-start space-x-3">
