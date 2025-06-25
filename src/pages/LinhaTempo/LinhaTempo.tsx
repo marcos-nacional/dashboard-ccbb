@@ -18,6 +18,7 @@ import {
 import { useConsolidadoData } from "../../services/api"
 import PDFDownloadButton from "../../components/PDFDownloadButton/PDFDownloadButton"
 import AnaliseSemanal from "./components/AnaliseSemanal"
+import Loading from "../../components/Loading/Loading"
 
 interface DataPoint {
   date: string
@@ -438,6 +439,18 @@ const LinhaTempo: React.FC = () => {
           platformColors={platformColors}
           onBack={() => setIsWeeklyAnalysis(false)}
         />
+      </div>
+    )
+  }
+
+  if (loading) {
+    return <Loading message="Carregando linha do tempo..." />
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50/90 backdrop-blur-sm border border-red-200 rounded-lg p-4">
+        <p className="text-red-600">Erro ao carregar dados: {error.message}</p>
       </div>
     )
   }

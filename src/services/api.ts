@@ -111,6 +111,28 @@ export const fetchShareCCBBData = async () => {
   }
 }
 
+// Função para buscar dados do Meta CCBB
+export const fetchCCBBMetaData = async () => {
+  try {
+    const response = await api.get("/ccbb/meta")
+    return response.data
+  } catch (error) {
+    console.error("Erro ao buscar dados do CCBB Meta:", error)
+    throw error
+  }
+}
+
+// Função para buscar dados do TikTok CCBB
+export const fetchCCBBTikTokData = async () => {
+  try {
+    const response = await api.get("/ccbb/tiktok")
+    return response.data
+  } catch (error) {
+    console.error("Erro ao buscar dados do CCBB TikTok:", error)
+    throw error
+  }
+}
+
 // Hook personalizado para usar os dados consolidados
 export const useConsolidadoData = () => {
   const [data, setData] = React.useState<any>(null)
@@ -326,6 +348,58 @@ export const useMetaCCBBData = () => {
     try {
       setLoading(true)
       const result = await fetchMetaCCBBData()
+      setData(result)
+      setError(null)
+    } catch (err) {
+      setError(err as Error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  return { data, loading, error, refetch: loadData }
+}
+
+// Hook personalizado para usar os dados do CCBB Meta
+export const useCCBBMetaData = () => {
+  const [data, setData] = React.useState<any>(null)
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<Error | null>(null)
+
+  const loadData = React.useCallback(async () => {
+    try {
+      setLoading(true)
+      const result = await fetchCCBBMetaData()
+      setData(result)
+      setError(null)
+    } catch (err) {
+      setError(err as Error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  return { data, loading, error, refetch: loadData }
+}
+
+// Hook personalizado para usar os dados do CCBB TikTok
+export const useCCBBTikTokData = () => {
+  const [data, setData] = React.useState<any>(null)
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<Error | null>(null)
+
+  const loadData = React.useCallback(async () => {
+    try {
+      setLoading(true)
+      const result = await fetchCCBBTikTokData()
       setData(result)
       setError(null)
     } catch (err) {

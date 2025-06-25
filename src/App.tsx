@@ -11,7 +11,7 @@ import VisaoGeral from "./pages/VisaoGeral/VisaoGeral"
 import Alcance from "./pages/Alcance/Alcance"
 import Visualizacoes from "./pages/Visualizacoes/Visualizacoes"
 import CriativosTikTok from "./pages/CriativosTikTok/CriativosTikTok"
-import CriativosMetaAds from "./pages/CriativosMetaAds/CriativosMetaAds"
+import CriativosMeta from "./pages/CriativosMetaAds/CriativosMetaAds"
 import Glossario from "./pages/Glossario/Glossario" // Nova importação para Glossario
 import "./App.css"
 
@@ -36,7 +36,7 @@ function App() {
                 <Route path="/visao-geral" element={<VisaoGeral />} />
                 <Route path="/alcance" element={<Alcance />} />
                 <Route path="/visualizacoes" element={<Visualizacoes />} />
-                <Route path="/criativos-meta-ads" element={<CriativosMetaAds />} />
+                <Route path="/criativos-meta" element={<CriativosMeta />} />
                 <Route path="/criativos-tiktok" element={<CriativosTikTok />} />
                 <Route path="/glossario" element={<Glossario />} /> {/* Nova rota para Glossario */}
               </Routes>
