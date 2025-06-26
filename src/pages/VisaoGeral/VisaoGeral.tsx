@@ -61,7 +61,7 @@ const VisaoGeral: React.FC = () => {
   const benchmarkMetrics = {
     cpm: 14.16, // R$ 5,00
     cpc: 1.14, // R$ 0,80
-    cpv: 0.10, // R$ 0,05 (Custo por Visualização de Vídeo - placeholder)
+    cpv: 0.1, // R$ 0,05 (Custo por Visualização de Vídeo - placeholder)
     ctr: 0.55, // 1.5%
     vtr: 6.34, // 70% (View-Through Rate - placeholder)
   }
@@ -228,9 +228,11 @@ const VisaoGeral: React.FC = () => {
   const totals = useMemo(() => {
     const investment = filteredData.reduce((sum, item) => sum + item.cost, 0)
     const impressions = filteredData.reduce((sum, item) => sum + item.impressions, 0)
-    const reach = Math.max(...filteredData.map((item) => item.reach), 0)
+    // Corrected: Sum the reach values instead of taking the maximum
+    const reach = filteredData.reduce((sum, item) => sum + item.reach, 0)
     const clicks = filteredData.reduce((sum, item) => sum + item.clicks, 0)
-    const frequency = filteredData.length > 0 && reach > 0 ? impressions / reach : 0
+    // Corrected: Calculate overall frequency as total impressions / total reach
+    const frequency = reach > 0 ? impressions / reach : 0
     const cpm = impressions > 0 ? investment / (impressions / 1000) : 0
     const cpc = clicks > 0 ? investment / clicks : 0
     const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0
@@ -572,12 +574,11 @@ const VisaoGeral: React.FC = () => {
               format={(val) => `${val.toFixed(2)}%`}
               isHigherBetter={true}
             />
-            
           </div>
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default VisaoGeral;
+export default VisaoGeral
