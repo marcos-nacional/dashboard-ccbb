@@ -59,11 +59,11 @@ const VisaoGeral: React.FC = () => {
 
   // Placeholder para dados de benchmark
   const benchmarkMetrics = {
-    cpm: 5.0, // R$ 5,00
-    cpc: 0.8, // R$ 0,80
-    cpv: 0.05, // R$ 0,05 (Custo por Visualização de Vídeo - placeholder)
-    ctr: 1.5, // 1.5%
-    vtr: 70, // 70% (View-Through Rate - placeholder)
+    cpm: 14.16, // R$ 5,00
+    cpc: 1.14, // R$ 0,80
+    cpv: 0.10, // R$ 0,05 (Custo por Visualização de Vídeo - placeholder)
+    ctr: 0.55, // 1.5%
+    vtr: 6.34, // 70% (View-Through Rate - placeholder)
   }
 
   const availablePlatforms = useMemo(() => {
@@ -552,7 +552,7 @@ const VisaoGeral: React.FC = () => {
               isHigherBetter={false}
             />
             <MetricComparison
-              label="CPV (Est.)"
+              label="CPV"
               value={totals.cpv}
               benchmark={benchmarkMetrics.cpv}
               format={(val) => `R$ ${val.toFixed(2)}`}
@@ -566,16 +566,13 @@ const VisaoGeral: React.FC = () => {
               isHigherBetter={true}
             />
             <MetricComparison
-              label="VTR (Est.)"
+              label="VTR"
               value={totals.vtr}
               benchmark={benchmarkMetrics.vtr}
               format={(val) => `${val.toFixed(2)}%`}
               isHigherBetter={true}
             />
-            <p className="text-xs text-gray-500 mt-2">
-              *CPV e VTR são estimativas baseadas em dados limitados. Para precisão, dados de visualização de vídeo são
-              necessários.
-            </p>
+            
           </div>
         </div>
       </div>

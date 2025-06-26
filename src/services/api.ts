@@ -486,3 +486,40 @@ export const useGA4ResumoData = () => {
 
   return { data, loading, error, refetch: loadData }
 }
+
+// Função para buscar dados consolidados de vídeo
+export const fetchConsolidadoVideoData = async () => {
+  try {
+    const response = await api.get("/ccbb/consolidado")
+    return response.data
+  } catch (error) {
+    console.error("Erro ao buscar dados consolidados de vídeo:", error)
+    throw error
+  }
+}
+
+// Hook personalizado para usar os dados consolidados de vídeo
+export const useConsolidadoVideoData = () => {
+  const [data, setData] = React.useState<any>(null)
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<Error | null>(null)
+
+  const loadData = React.useCallback(async () => {
+    try {
+      setLoading(true)
+      const result = await fetchConsolidadoVideoData()
+      setData(result)
+      setError(null)
+    } catch (err) {
+      setError(err as Error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  return { data, loading, error, refetch: loadData }
+}

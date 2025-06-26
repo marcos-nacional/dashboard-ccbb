@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect, useMemo } from "react"
 import { Play, Calendar, Filter, ShoppingCart, MapPin, Info } from "lucide-react"
-import { useConsolidadoData } from "../../services/api"
+import { useConsolidadoVideoData } from "../../services/api"
 import Loading from "../../components/Loading/Loading"
 
 interface ProcessedData {
@@ -56,7 +56,7 @@ interface PlatformMetrics {
 }
 
 const Visualizacoes: React.FC = () => {
-  const { data: apiData, loading, error } = useConsolidadoData()
+  const { data: apiData, loading, error } = useConsolidadoVideoData()
   const [processedData, setProcessedData] = useState<ProcessedData[]>([])
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: "", end: "" })
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
@@ -105,6 +105,20 @@ const Visualizacoes: React.FC = () => {
     })
   }
 
+  // Função para converter data de dd/MM/yyyy para yyyy-MM-dd
+  const convertDateFormat = (dateStr: string): string => {
+    if (!dateStr) return ""
+    const [day, month, year] = dateStr.split("/")
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`
+  }
+
+  // Função para converter data de yyyy-MM-dd para dd/MM/yyyy
+  const convertDateToDisplay = (dateStr: string): string => {
+    if (!dateStr) return ""
+    const [year, month, day] = dateStr.split("-")
+    return `${day}/${month}/${year}`
+  }
+
   // Processar dados da API
   useEffect(() => {
     if (apiData?.values && apiData.values.length > 1) {
@@ -114,13 +128,22 @@ const Visualizacoes: React.FC = () => {
 
         // Verificar se os headers necessários existem
         const requiredHeaders = [
-          "Date", "Plataforma", "Campaign name", "Impressions", "Cost", "Reach", "Link clicks",
-          "Frequência", "CPM", "Visualizações de vídeo a 100%", "Visualizações de vídeo a 25%",
-          "Visualizações de vídeo a 50%", "Visualizações de vídeo a 75%", "CPV", "VTR 100%",
-          "Tipo de Compra", "Praça", "Tipo de formato"
+          "Date",
+          "Plataforma",
+          "Campaign name",
+          "Impressions",
+          "Total spent",
+          "Reach",
+          "Clicks",
+          "Video views ",
+          "Video views at 25%",
+          "Video views at 50%",
+          "Video views at 75%",
+          "Video completions ",
+          "Tipo de Compra",
         ]
-        
-        const missingHeaders = requiredHeaders.filter(header => !headers.includes(header))
+
+        const missingHeaders = requiredHeaders.filter((header) => !headers.includes(header))
         if (missingHeaders.length > 0) {
           console.warn("Headers ausentes:", missingHeaders)
         }
@@ -143,43 +166,56 @@ const Visualizacoes: React.FC = () => {
             }
 
             const impressions = parseInteger(getHeaderValue("Impressions"))
-            const videoViews = parseInteger(getHeaderValue("Visualizações de vídeo a 100%"))
-            const videoCompletions = parseInteger(getHeaderValue("Visualizações de vídeo a 100%"))
-            const cost = parseNumber(getHeaderValue("Cost"))
-            const tipoFormato = getHeaderValue("Tipo de formato")
+            const videoViews = parseInteger(getHeaderValue("Video views "))
+            const videoCompletions = parseInteger(getHeaderValue("Video completions "))
+            const cost = parseNumber(getHeaderValue("Total spent"))
+            const platform = getHeaderValue("Plataforma")
+            const campaignName = getHeaderValue("Campaign name")
+
+            // Usar a coluna "Praça" diretamente ao invés de extrair do nome da campanha
+            const praca = getHeaderValue("Praça") || "Não Definida"
+
+            // Extrair tipo de compra
+            const tipoCompra = getHeaderValue("Tipo de Compra") || "CPM"
+
+            // Converter data para formato ISO
+            const originalDate = getHeaderValue("Date")
+            const convertedDate = convertDateFormat(originalDate)
 
             return {
-              date: getHeaderValue("Date"),
-              platform: getHeaderValue("Plataforma") || "Outros",
-              campaignName: getHeaderValue("Campaign name"),
+              date: convertedDate, // Usar data convertida
+              platform: platform || "Outros",
+              campaignName: campaignName,
               impressions: impressions,
               cost: cost,
               reach: parseInteger(getHeaderValue("Reach")),
-              clicks: parseInteger(getHeaderValue("Link clicks")),
-              frequency: parseNumber(getHeaderValue("Frequência")) || 1,
-              cpm: parseNumber(getHeaderValue("CPM")),
-              linkClicks: parseInteger(getHeaderValue("Link clicks")),
+              clicks: parseInteger(getHeaderValue("Clicks")),
+              frequency:
+                impressions > 0 && parseInteger(getHeaderValue("Reach")) > 0
+                  ? impressions / parseInteger(getHeaderValue("Reach"))
+                  : 1,
+              cpm: impressions > 0 ? cost / (impressions / 1000) : 0,
+              linkClicks: parseInteger(getHeaderValue("Clicks")),
               videoViews: videoViews,
-              videoViews25: parseInteger(getHeaderValue("Visualizações de vídeo a 25%")),
-              videoViews50: parseInteger(getHeaderValue("Visualizações de vídeo a 50%")),
-              videoViews75: parseInteger(getHeaderValue("Visualizações de vídeo a 75%")),
+              videoViews25: parseInteger(getHeaderValue("Video views at 25%")),
+              videoViews50: parseInteger(getHeaderValue("Video views at 50%")),
+              videoViews75: parseInteger(getHeaderValue("Video views at 75%")),
               videoCompletions: videoCompletions,
-              cpv: parseNumber(getHeaderValue("CPV")) || (videoViews > 0 ? cost / videoViews : 0),
-              cpvc: parseNumber(getHeaderValue("CPV")) || (videoCompletions > 0 ? cost / videoCompletions : 0),
+              cpv: videoViews > 0 ? cost / videoViews : 0,
+              cpvc: videoCompletions > 0 ? cost / videoCompletions : 0,
               vtr100: impressions > 0 && videoCompletions > 0 ? (videoCompletions / impressions) * 100 : 0,
-              tipoCompra: getHeaderValue("Tipo de Compra") || "CPM",
-              praca: getHeaderValue("Praça") || "Não Definida",
-              tipoFormato: tipoFormato,
+              tipoCompra: tipoCompra,
+              praca: praca, // Usar praça direta da API
+              tipoFormato: "Vídeo", // Assumindo que todos são vídeo na nova API
             } as ProcessedData
           })
           .filter((item: ProcessedData) => {
-            // Filtros mais rigorosos para dados de vídeo
+            // Filtrar apenas dados com impressões e que tenham dados de vídeo
             return (
-              item.date && 
-              item.impressions > 0 && 
-              item.videoViews > 0 && // Deve ter visualizações de vídeo
-              item.tipoFormato === "Vídeo" && // Deve ser do tipo Vídeo
-              ["YouTube", "TikTok", "Netflix", "Spotify"].includes(item.platform) // Apenas plataformas de vídeo
+              item.date &&
+              item.impressions > 0 &&
+              (item.videoViews > 0 || item.videoCompletions > 0) && // Deve ter pelo menos uma métrica de vídeo
+              item.platform // Deve ter plataforma definida
             )
           })
 
@@ -233,7 +269,6 @@ const Visualizacoes: React.FC = () => {
         const pracas = Array.from(pracaSet).filter(Boolean).sort()
         setAvailablePracas(pracas)
         setSelectedPracas([])
-
       } catch (error) {
         console.error("Erro ao processar dados:", error)
       }
@@ -344,7 +379,8 @@ const Visualizacoes: React.FC = () => {
         metric.cpvc = metric.videoCompletions > 0 ? metric.cost / metric.videoCompletions : 0
         metric.vtr100 = metric.impressions > 0 ? (metric.videoCompletions / metric.impressions) * 100 : 0
         metric.percentage = totalCost > 0 ? (metric.cost / totalCost) * 100 : 0
-        metric.visualizacoesPercentage = totalVisualizacoes > 0 ? (metric.videoCompletions / totalVisualizacoes) * 100 : 0
+        metric.visualizacoesPercentage =
+          totalVisualizacoes > 0 ? (metric.videoCompletions / totalVisualizacoes) * 100 : 0
         metric.vtrPercentage = maxVtr > 0 ? (metric.vtr100 / maxVtr) * 100 : 0
         // Ordenar tipos de compra
         metric.tiposCompra = sortTiposCompra(metric.tiposCompra)
@@ -448,7 +484,7 @@ const Visualizacoes: React.FC = () => {
               platform.videoViews25,
               platform.videoViews50,
               platform.videoViews75,
-              platform.videoCompletions
+              platform.videoCompletions,
             )
 
             const retention25 = totalViews > 0 ? (platform.videoViews25 / totalViews) * 100 : 0
@@ -457,7 +493,8 @@ const Visualizacoes: React.FC = () => {
             const retention100 = totalViews > 0 ? (platform.videoCompletions / totalViews) * 100 : 0
 
             // Determine if 25%, 50%, 75% data is all zero
-            const hasIntermediateData = platform.videoViews25 > 0 || platform.videoViews50 > 0 || platform.videoViews75 > 0
+            const hasIntermediateData =
+              platform.videoViews25 > 0 || platform.videoViews50 > 0 || platform.videoViews75 > 0
 
             const retentionPoints = hasIntermediateData
               ? [
@@ -900,9 +937,9 @@ const Visualizacoes: React.FC = () => {
             <h3 className="text-sm font-medium text-blue-900 mb-1">Informações sobre Métricas de Vídeo</h3>
             <p className="text-sm text-blue-700">
               As métricas de <strong>visualizações</strong> e <strong>VTR</strong> são baseadas nos dados fornecidos
-              pelas plataformas. O <strong>CPV</strong> representa o custo por visualização e o{" "}
-              <strong>CPVc</strong> o custo por visualização completa (100%). Estes valores podem variar conforme as
-              configurações de campanha e as definições específicas de cada plataforma.
+              pelas plataformas. O <strong>CPV</strong> representa o custo por visualização e o <strong>CPVc</strong> o
+              custo por visualização completa (100%). Estes valores podem variar conforme as configurações de campanha e
+              as definições específicas de cada plataforma.
             </p>
           </div>
         </div>

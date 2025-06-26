@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useMemo } from "react"
-import { Video, Calendar, Filter } from "lucide-react"
+import { Calendar, Filter } from "lucide-react"
 import { useCCBBTikTokData } from "../../services/api"
 import Loading from "../../components/Loading/Loading"
 
@@ -34,11 +34,26 @@ interface CreativeData {
   paidFollows: number
 }
 
+// Mapeamento de praças para nomes completos
+const pracaMapping: Record<string, string> = {
+  BSB: "Brasília",
+  BH: "Belo Horizonte",
+  RJ: "Rio de Janeiro",
+  SP: "São Paulo",
+  SSA: "Salvador",
+}
+
+// Função para extrair praça do nome da campanha
+const extractPracaFromCampaign = (campaignName: string): string => {
+  const match = campaignName.match(/VÍDEO\s*-\s*([A-Z]{2,3})(?:\s|$)/)
+  return match ? match[1] : ""
+}
+
 const CriativosTikTok: React.FC = () => {
   const { data: apiData, loading, error } = useCCBBTikTokData()
   const [processedData, setProcessedData] = useState<CreativeData[]>([])
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: "", end: "" })
-  const [selectedCampaign, setSelectedCampaign] = useState<string>("")
+  const [selectedPraca, setSelectedPraca] = useState<string>("")
   const [availableCampaigns, setAvailableCampaigns] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
@@ -127,15 +142,16 @@ const CriativosTikTok: React.FC = () => {
         setDateRange({ start: startDate, end: endDate })
       }
 
-      // Extrair campanhas únicas
-      const campaignSet = new Set<string>()
+      // Extrair praças únicas
+      const pracaSet = new Set<string>()
       processed.forEach((item) => {
-        if (item.campaignName) {
-          campaignSet.add(item.campaignName)
+        const praca = extractPracaFromCampaign(item.campaignName)
+        if (praca) {
+          pracaSet.add(praca)
         }
       })
-      const campaigns = Array.from(campaignSet).filter(Boolean)
-      setAvailableCampaigns(campaigns)
+      const pracas = Array.from(pracaSet).filter(Boolean).sort()
+      setAvailableCampaigns(pracas) // Reusing the same state variable
     }
   }, [apiData])
 
@@ -153,9 +169,12 @@ const CriativosTikTok: React.FC = () => {
       })
     }
 
-    // Filtro por campanha
-    if (selectedCampaign) {
-      filtered = filtered.filter((item) => item.campaignName.includes(selectedCampaign))
+    // Filtro por praça
+    if (selectedPraca) {
+      filtered = filtered.filter((item) => {
+        const praca = extractPracaFromCampaign(item.campaignName)
+        return praca === selectedPraca
+      })
     }
 
     // Agrupar por criativo APÓS a filtragem
@@ -196,7 +215,7 @@ const CriativosTikTok: React.FC = () => {
     finalData.sort((a, b) => b.cost - a.cost)
 
     return finalData
-  }, [processedData, selectedCampaign, dateRange])
+  }, [processedData, selectedPraca, dateRange])
 
   // Paginação
   const paginatedData = useMemo(() => {
@@ -271,17 +290,17 @@ const CriativosTikTok: React.FC = () => {
     )
   }
 
+  const availablePracas = availableCampaigns
+
   return (
     <div className="space-y-6 h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-red-600 rounded-lg flex items-center justify-center">
-            
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z" />
             </svg>
-    
           </div>
           <div>
             <h1 className="text-3xl font-bold text-gray-900 text-enhanced">TikTok - Criativos</h1>
@@ -324,17 +343,17 @@ const CriativosTikTok: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
               <Filter className="w-4 h-4 mr-2" />
-              Campanha
+              Praça
             </label>
             <select
-              value={selectedCampaign}
-              onChange={(e) => setSelectedCampaign(e.target.value)}
+              value={selectedPraca}
+              onChange={(e) => setSelectedPraca(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 text-sm"
             >
-              <option value="">Todas as campanhas</option>
-              {availableCampaigns.map((campaign, index) => (
-                <option key={index} value={campaign}>
-                  {truncateText(campaign, 50)}
+              <option value="">Todas as praças</option>
+              {availablePracas.map((praca, index) => (
+                <option key={index} value={praca}>
+                  {pracaMapping[praca] || praca}
                 </option>
               ))}
             </select>
