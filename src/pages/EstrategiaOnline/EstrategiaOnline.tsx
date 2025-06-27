@@ -378,44 +378,55 @@ const EstrategiaOnline: React.FC = () => {
       <div className="card-overlay rounded-lg shadow-lg p-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Resumo por Praça</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {pracaTotals.map((praca, index) => (
-            <div
-              key={index}
-              className={`rounded-lg p-4 cursor-pointer transition-all duration-200 ${
-                selectedPraca === praca.praca
-                  ? "bg-blue-100 border-2 border-blue-500 shadow-md"
-                  : "bg-gray-50 border-2 border-transparent hover:bg-gray-100 hover:shadow-sm"
-              }`}
-              onClick={() => setSelectedPraca(selectedPraca === praca.praca ? null : praca.praca)}
-            >
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">{praca.praca}</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Previsto:</span>
-                  <span className="font-medium">{formatCurrency(praca.totalPrevisto)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Realizado:</span>
-                  <span className="font-medium">{formatCurrency(praca.totalInvestido)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Pacing:</span>
-                  <span className="font-semibold" style={{ color: getPacingColor(praca.pacing) }}>
-                    {praca.pacing.toFixed(1)}%
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                  <div
-                    className="h-2 rounded-full transition-all duration-500"
-                    style={{
-                      width: `${Math.min(praca.pacing, 100)}%`,
-                      backgroundColor: getPacingColor(praca.pacing),
-                    }}
-                  />
+          {pracaTotals.map((praca, index) => {
+            const shouldShowFullInfo = praca.praca === "Salvador"
+            const hiddenPracas = ["Brasília", "São Paulo", "Rio de Janeiro", "Belo Horizonte"]
+            
+            return (
+              <div
+                key={index}
+                className={`rounded-lg p-4 cursor-pointer transition-all duration-200 ${
+                  selectedPraca === praca.praca
+                    ? "bg-blue-100 border-2 border-blue-500 shadow-md"
+                    : "bg-gray-50 border-2 border-transparent hover:bg-gray-100 hover:shadow-sm"
+                }`}
+                onClick={() => setSelectedPraca(selectedPraca === praca.praca ? null : praca.praca)}
+              >
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">{praca.praca}</h3>
+                <div className="space-y-2">
+                  {shouldShowFullInfo && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Previsto:</span>
+                      <span className="font-medium">{formatCurrency(praca.totalPrevisto)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Realizado:</span>
+                    <span className="font-medium">{formatCurrency(praca.totalInvestido)}</span>
+                  </div>
+                  {shouldShowFullInfo && (
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Pacing:</span>
+                        <span className="font-semibold" style={{ color: getPacingColor(praca.pacing) }}>
+                          {praca.pacing.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                        <div
+                          className="h-2 rounded-full transition-all duration-500"
+                          style={{
+                            width: `${Math.min(praca.pacing, 100)}%`,
+                            backgroundColor: getPacingColor(praca.pacing),
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
         {selectedPraca && (
           <div className="mt-4 text-center">
